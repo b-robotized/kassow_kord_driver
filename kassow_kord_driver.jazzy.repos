@@ -1,0 +1,5 @@
+repositories:
+  kassow_kord_vendor:
+    type: git
+    url: git@github.com:b-robotized/kassow_kord_vendor.git
+    version: master
