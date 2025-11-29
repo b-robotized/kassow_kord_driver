@@ -10,14 +10,6 @@
 // use and change right, except distributing this library separately
 // of their product.
 
-// TODO use namespaces so u dont have to repeat hardware_interface::
-// TODO remove log debugs from read and write after testing
-// TODO handle exceptions from adapter calls
-// TODO current approach of appending itf name to joint name vs. making vectors with these full names.
-// TODO use index variable for the joints and order them instead of relying ion URDF order?
-// TODO maybe do some alarm or error clearing if any of these commands fail?
-// TODO the waitsync timeout is different in different examples (10 vs 500). do we need more time for first sync?
-
 #include "kassow_kord_driver/kassow_kord_driver.hpp"
 #include "kassow_kord_driver/kassow_kord_adapter.hpp"
 
@@ -57,8 +49,6 @@ hardware_interface::CallbackReturn KassowKordDriver::on_init(
     std::string ip_address = hw_params.at("ip_address");
   }
   
-  // TODO(yara): validate IP address format?
-  // TODO(yara): do the realtime configs if priority is higher than 0
   // Get optional parameters with defaults
   int port = 7582;
   if (hw_params.find("port") != hw_params.end()) {

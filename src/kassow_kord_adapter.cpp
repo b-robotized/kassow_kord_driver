@@ -25,6 +25,8 @@ using namespace kr2;
 namespace kassow_kord_driver
 {
   constexpr size_t JOINT_COUNT = 7;
+  constexpr double TT_VALUE = 5.0;    // tracking time - TODO(yara): make configurable
+  constexpr double BT_VALUE = 3.0;    // blend time - TODO(yara): make configurable
 
 class KordAdapter
 {
@@ -48,7 +50,6 @@ public:
   bool connect()
   {
     if (!kord->connect()) {
-      std::cout << "Connecting to KR failed\n";
       connected_ = false;
       return connected_;
     }
@@ -95,6 +96,24 @@ public:
   {
     if (!connected_)
       return false;
+
+    try
+    {
+      if (!ctl_iface.moveJ(position_cmds,
+            kr2::kord::TrackingType::TT_TIME,
+            TT_VALUE,
+            kr2::kord::BlendType::BT_TIME,
+            BT_VALUE,
+            kr2::kord::OverlayType::OT_VIAPOINT))
+      {
+        return false;
+      }
+    }
+    catch(const std::exception& e)
+    {
+      RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "Exception in writeJointPositions: %s", e.what());
+      return false;
+    }
 
     return true;
   }
