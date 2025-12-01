@@ -28,11 +28,56 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
-#include "kassow_kord_driver.hpp"
-#include "kassow_kord_adapter.hpp"
+#include <kord/api/kord.h> 
+#include <kord/version.h>
+#include <kord/api/kord_control_interface.h>
+#include <kord/api/kord_receive_interface.h>
+
+using namespace kr2;
 
 namespace kassow_kord_driver
 {
+const size_t KORD_JOINT_COUNT = 7;
+
+class KordAdapter
+{
+public:
+  KordAdapter() = default;
+  ~KordAdapter() = default;
+
+  // Initialize underlying kord connection resources. Returns true on success.
+  bool init(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms);
+
+  // Connect/disconnect
+  bool connect();
+  void disconnect();
+  bool isConnected() const { return connected_; }
+
+  // Wait for sync (blocking with timeout configured in init)
+  bool waitSync();
+
+  // Reset alarms
+  bool reset_alarms();
+
+  // Read joint states. All arrays must have size KORD_JOINT_COUNT.
+  bool readJointStates(std::array<double, KORD_JOINT_COUNT>& positions,
+                       std::array<double, KORD_JOINT_COUNT>& velocities,
+                       std::array<double, KORD_JOINT_COUNT>& efforts);
+
+  // Write joint position commands (size KORD_JOINT_COUNT).
+  bool writeJointPositions(const std::array<double, KORD_JOINT_COUNT>& position_cmds);
+
+  // Lightweight configuration helper
+  void configure(int waitSync_timeout_ms);
+
+private:
+  std::shared_ptr<kord::KordCore> kord_;
+  std::unique_ptr<kord::ControlInterface> ctl_iface_;
+  std::unique_ptr<kord::ReceiverInterface> rcv_iface_;
+  bool connected_{false};
+  int waitSync_timeout_ms_{500};
+};
+
 class KassowKordDriver : public hardware_interface::SystemInterface
 {
 public:
@@ -57,10 +102,9 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
-  const size_t JOINT_COUNT = 7;
-  std::shared_ptr<kassow_kord_adapter::KordAdapter> kord_adapter_;
-  std::array<std::string, JOINT_COUNT> joint_names_;
-  std::map<std::string, uint8_t> joint_finger_ids_;
+  std::shared_ptr<KordAdapter> kord_adapter_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_names_;
+  std::string ip_address_;
 };
 
 }  // namespace kassow_kord_driver

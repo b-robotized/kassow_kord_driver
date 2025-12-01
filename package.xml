@@ -5,13 +5,14 @@
   <version>0.0.0</version>
   <description>ros2 control hardware interface for Kassow Kord Robot.</description>
 
-  <author email="">Nikola</author>
-  <author email="">Denis</author>
+  <maintainer email="nikola.banovic@b-robotized.com">Nikola Banovic</maintainer>
+  <maintainer email="yara.shahin@b-robotized.com">Yara Shahin</maintainer>
+  <maintainer email="denis.stogl@b-robotized.com">Denis Štogl</maintainer>
 
   <license>Apache-2.0</license>
 
   <author email="yara.shahin@b-robotized.com">Yara Shahin</author>
-  <author email="">Nikola</author>
+  <author email="nikola.banovic@b-robotized.com">Nikola Banovic</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>ros2_control_cmake</build_depend>
@@ -21,6 +22,7 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
+  <depend>kassow_kord_vendor</depend>
 
   <exec_depend>controller_manager</exec_depend>
 

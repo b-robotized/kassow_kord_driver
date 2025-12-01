@@ -15,6 +15,7 @@ set(THIS_PACKAGE_DEPS
   pluginlib
   rclcpp
   rclcpp_lifecycle
+  kassow_kord_vendor
 )
 
 # find dependencies
@@ -25,38 +26,36 @@ foreach(PACKAGE ${THIS_PACKAGE_DEPS})
 endforeach()
 
 add_library(
-  kassow_kord_driver
+  ${PROJECT_NAME}
   SHARED
   src/kassow_kord_driver.cpp
 )
 target_include_directories(
-  kassow_kord_driver
+  ${PROJECT_NAME}
   PUBLIC
   include
   # ${KASSOW_VENDOR_INCLUDE_DIR}
 )
 ament_target_dependencies(
-  kassow_kord_driver
+  ${PROJECT_NAME}
   ${THIS_PACKAGE_DEPS}
 )
 
 # Link your driver library
-# target_link_libraries(kassow_kord_driver
-#   ${KASSOW_VENDOR_LIBRARY}
-# )
+target_link_libraries(${PROJECT_NAME}
+  kord-api::kord-api
+)
 
 # prevent pluginlib from using boost
-target_compile_definitions(kassow_kord_driver PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 pluginlib_export_plugin_description_file(
   hardware_interface kassow_kord_driver.xml)
 
 install(
   TARGETS
-  kassow_kord_driver
-  RUNTIME DESTINATION bin
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
+  ${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
@@ -79,7 +78,7 @@ ament_export_include_directories(
   include
 )
 ament_export_libraries(
-  kassow_kord_driver
+  ${PROJECT_NAME}
 )
 ament_export_dependencies(
   hardware_interface
