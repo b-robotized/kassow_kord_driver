@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(kassow_kord_driver)
+project(kassow_kord_hardware_interface)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,7 +28,7 @@ endforeach()
 add_library(
   ${PROJECT_NAME}
   SHARED
-  src/kassow_kord_driver.cpp
+  src/kassow_kord_hardware_interface.cpp
 )
 target_include_directories(
   ${PROJECT_NAME}
@@ -50,7 +50,7 @@ target_link_libraries(${PROJECT_NAME}
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 pluginlib_export_plugin_description_file(
-  hardware_interface kassow_kord_driver.xml)
+  hardware_interface kassow_kord_hardware_interface.xml)
 
 install(
   TARGETS
@@ -64,10 +64,10 @@ install(
 )
 
 if(ENABLE_TEST)
-  ament_add_gmock(test_kassow_kord_driver test/test_kassow_kord_driver.cpp)
-  target_include_directories(test_kassow_kord_driver PRIVATE include)
+  ament_add_gmock(test_kassow_kord_hardware_interface test/test_kassow_kord_hardware_interface.cpp)
+  target_include_directories(test_kassow_kord_hardware_interface PRIVATE include)
   ament_target_dependencies(
-    test_kassow_kord_driver
+    test_kassow_kord_hardware_interface
     hardware_interface
     pluginlib
     ros2_control_test_assets

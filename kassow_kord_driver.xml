@@ -1,9 +1,0 @@
-<library path="kassow_kord_driver">
-  <class name="kassow_kord_driver/KassowKordDriver"
-         type="kassow_kord_driver::KassowKordDriver"
-         base_class_type="hardware_interface::SystemInterface">
-    <description>
-      Kassow Kord Robot ros2_control hardware interface.
-    </description>
-  </class>
-</library>

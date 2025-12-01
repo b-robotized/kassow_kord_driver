@@ -10,8 +10,8 @@
 // use and change right, except distributing this library separately
 // of their product.
 
-#ifndef kassow_kord_driver__KASSOW_KORD_DRIVER_HPP_
-#define kassow_kord_driver__KASSOW_KORD_DRIVER_HPP_
+#ifndef kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
+#define kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
 
 #include <cstring>
 #include <iostream>
@@ -35,7 +35,7 @@
 
 using namespace kr2;
 
-namespace kassow_kord_driver
+namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
 
@@ -78,10 +78,10 @@ private:
   int waitSync_timeout_ms_{500};
 };
 
-class KassowKordDriver : public hardware_interface::SystemInterface
+class KassowKordHardwareInterface : public hardware_interface::SystemInterface
 {
 public:
-  RCLCPP_SHARED_PTR_DEFINITIONS(KassowKordDriver)
+  RCLCPP_SHARED_PTR_DEFINITIONS(KassowKordHardwareInterface)
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareComponentInterfaceParams & params) override;
@@ -107,6 +107,6 @@ private:
   std::string ip_address_;
 };
 
-}  // namespace kassow_kord_driver
+}  // namespace kassow_kord_hardware_interface
 
-#endif  // kassow_kord_driver__KASSOW_KORD_DRIVER_HPP_
+#endif  // kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_

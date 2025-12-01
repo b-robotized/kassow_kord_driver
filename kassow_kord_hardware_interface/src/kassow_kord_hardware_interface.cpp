@@ -10,13 +10,13 @@
 // use and change right, except distributing this library separately
 // of their product.
 
-#include "kassow_kord_driver/kassow_kord_driver.hpp"
+#include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 /**
- * \file kassow_kord_driver.cpp
+ * \file kassow_kord_hardware_interface.cpp
  * \brief Hardware interface for Kassow Kord robots using the kord-api.
  * params:
  *   - ip_address (string, required): IP address of the robot controller.
@@ -24,7 +24,7 @@
  *   - session_id (int, optional, default=1): Kord session ID.
  *   - waitSync_timeout_ms (int, optional, default=500): Timeout for waitSync in milliseconds.
  */
-namespace kassow_kord_driver
+namespace kassow_kord_hardware_interface
 {  
 constexpr double TT_VALUE = 5.0;    // tracking time - TODO(yara): make configurable
 constexpr double BT_VALUE = 3.0;    // blend time - TODO(yara): make configurable
@@ -128,9 +128,9 @@ void KordAdapter::disconnect()
 }
 
 // -----------------------------
-// KassowKordDriver implementation
+// KassowKordHardwareInterface implementation
 // -----------------------------
-hardware_interface::CallbackReturn KassowKordDriver::on_init(
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 {
   if (
@@ -171,7 +171,7 @@ hardware_interface::CallbackReturn KassowKordDriver::on_init(
   if (info_.joints.size() != KORD_JOINT_COUNT)
   {
     RCLCPP_FATAL(
-      get_logger(), "KassowKordDriver requires exactly 7 joints defined in the URDF/hardware config.");
+      get_logger(), "KassowKordHardwareInterface requires exactly 7 joints defined in the URDF/hardware config.");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -228,12 +228,12 @@ hardware_interface::CallbackReturn KassowKordDriver::on_init(
   // init adapter with joint count
   kord_adapter_->init(ip_address_, port, session_id, waitSync_timeout_ms);
 
-  RCLCPP_INFO(get_logger(), "KassowKordDriver on_init completed for %zu joints", KORD_JOINT_COUNT);
+  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface on_init completed for %zu joints", KORD_JOINT_COUNT);
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-hardware_interface::CallbackReturn KassowKordDriver::on_configure(
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Establish connection to the robot using the adapter.
@@ -243,11 +243,11 @@ hardware_interface::CallbackReturn KassowKordDriver::on_configure(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  RCLCPP_INFO(get_logger(), "KassowKordDriver configured and connected");
+  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-hardware_interface::CallbackReturn KassowKordDriver::on_activate(
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Reset robot errors and alarms as needed 
@@ -289,7 +289,7 @@ hardware_interface::CallbackReturn KassowKordDriver::on_activate(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-hardware_interface::CallbackReturn KassowKordDriver::on_deactivate(
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   kord_adapter_->disconnect();
@@ -299,7 +299,7 @@ hardware_interface::CallbackReturn KassowKordDriver::on_deactivate(
 }
 
 // read: fetch current joint states from the robot and populate ROS2 control state buffers.
-hardware_interface::return_type KassowKordDriver::read(
+hardware_interface::return_type KassowKordHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   if (!kord_adapter_->waitSync())
@@ -331,7 +331,7 @@ hardware_interface::return_type KassowKordDriver::read(
   return hardware_interface::return_type::OK;
 }
 
-hardware_interface::return_type KassowKordDriver::write(
+hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
@@ -350,8 +350,8 @@ hardware_interface::return_type KassowKordDriver::write(
   return hardware_interface::return_type::OK;
 }
 
-}  // namespace kassow_kord_driver
+}  // namespace kassow_kord_hardware_interface
 
 #include "pluginlib/class_list_macros.hpp"
 
-PLUGINLIB_EXPORT_CLASS(kassow_kord_driver::KassowKordDriver, hardware_interface::SystemInterface)
+PLUGINLIB_EXPORT_CLASS(kassow_kord_hardware_interface::KassowKordHardwareInterface, hardware_interface::SystemInterface)
