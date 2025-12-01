@@ -6,6 +6,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(kassow_kord_hardware_interface REQUIRED)
 
 install(
   DIRECTORY config launch urdf

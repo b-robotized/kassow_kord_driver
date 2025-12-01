@@ -33,8 +33,6 @@
 #include <kord/api/kord_control_interface.h>
 #include <kord/api/kord_receive_interface.h>
 
-using namespace kr2;
-
 namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
@@ -42,8 +40,12 @@ const size_t KORD_JOINT_COUNT = 7;
 class KordAdapter
 {
 public:
-  KordAdapter() = default;
-  ~KordAdapter() = default;
+  KordAdapter(
+  const std::string & ip_address,
+  int port,
+  int session_id,
+  int waitSync_timeout_ms);
+  ~KordAdapter();
 
   // Initialize underlying kord connection resources. Returns true on success.
   bool init(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms);
@@ -71,9 +73,9 @@ public:
   void configure(int waitSync_timeout_ms);
 
 private:
-  std::shared_ptr<kord::KordCore> kord_;
-  std::unique_ptr<kord::ControlInterface> ctl_iface_;
-  std::unique_ptr<kord::ReceiverInterface> rcv_iface_;
+  std::shared_ptr<kr2::kord::KordCore> kord_;
+  std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
+  std::unique_ptr<kr2::kord::ReceiverInterface> rcv_iface_;
   bool connected_{false};
   int waitSync_timeout_ms_{500};
 };
@@ -104,7 +106,7 @@ public:
 private:
   std::shared_ptr<KordAdapter> kord_adapter_;
   std::array<std::string, KORD_JOINT_COUNT> joint_names_;
-  std::string ip_address_;
+  std::string ip_address;
 };
 
 }  // namespace kassow_kord_hardware_interface

@@ -32,22 +32,44 @@ constexpr double BT_VALUE = 3.0;    // blend time - TODO(yara): make configurabl
 // -----------------------------
 // KordAdapter method implementations
 // -----------------------------
-bool KordAdapter::init(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms)
+// Constructors
+KordAdapter::KordAdapter(
+  const std::string & ip_address,
+  int port,
+  int session_id,
+  int waitSync_timeout_ms)
+: waitSync_timeout_ms_(waitSync_timeout_ms),
+  connected_(false)
 {
-  // std::shared_ptr<kord::KordCore> kord(new kord::KordCore(ip_address, port, session_id, kord::UDP_CLIENT));
-  
-  // kord::ControlInterface ctl_iface(kord);
-  // kord::ReceiverInterface rcv_iface(kord);
-  
-  // Create an instance of KordCore for handling RX/TX KORD frames.
-  kord_ = std::make_shared<kord::KordCore>(ip_address, port, session_id, kord::UDP_CLIENT);
-  
-  // Initialize Control and Receiver Interfaces.
-  ctl_iface_ = std::make_unique<kord::ControlInterface>(kord_);
-  rcv_iface_ = std::make_unique<kord::ReceiverInterface>(kord_);
+  try
+  {
+    kord_ = std::shared_ptr<kr2::kord::KordCore>(
+    new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
-  waitSync_timeout_ms_ = waitSync_timeout_ms;
-  return true;
+    // Initialize Control and Receiver Interfaces.
+    ctl_iface_ = std::make_unique<kr2::kord::ControlInterface>(kord_);
+    rcv_iface_ = std::make_unique<kr2::kord::ReceiverInterface>(kord_);
+  }
+  catch(const std::exception& e)
+  {
+    RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "KordAdapter initialization failed");
+  }
+  
+  RCLCPP_INFO(rclcpp::get_logger("KassowKordAdapter"), "KordAdapter initialized for IP %s:%d with session ID %d",
+              ip_address.c_str(), port, session_id);
+}
+
+// TODO: put in on cleanup
+KordAdapter::~KordAdapter()
+{
+  // Best-effort disconnect in destructor; swallow exceptions.
+  try
+  {
+    disconnect();
+  }
+  catch (...)
+  {
+  }
 }
 
 bool KordAdapter::connect()
@@ -87,14 +109,13 @@ bool KordAdapter::readJointStates(std::array<double, 7>& positions,
     return false;
 
   rcv_iface_->fetchData();
-  positions = rcv_iface_->getJoint(kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
-  velocities = rcv_iface_->getJoint(kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
-  efforts = rcv_iface_->getJoint(kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
+  positions = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
+  velocities = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
+  efforts = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
   
   return true;
 }
 
-// TODO
 bool KordAdapter::writeJointPositions(const std::array<double, 7>& position_cmds)
 {
   if (!connected_)
@@ -103,7 +124,7 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7>& position_cmds
   try
   {
     if (!ctl_iface_->moveJ(position_cmds,
-          kr2::kord::TrackingType::TT_TIME,
+          kr2::kord::TrackingType::TT_NONE,
           TT_VALUE,
           kr2::kord::BlendType::BT_TIME,
           BT_VALUE,
@@ -149,7 +170,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
   else
   {
-    ip_address_ = hw_params.at("ip_address");
+    ip_address = hw_params.at("ip_address");
   }
   
   // Get optional parameters with defaults
@@ -226,7 +247,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
 
   // init adapter with joint count
-  kord_adapter_->init(ip_address_, port, session_id, waitSync_timeout_ms);
+  kord_adapter_ = std::make_shared<KordAdapter>(ip_address, port, session_id, waitSync_timeout_ms);
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface on_init completed for %zu joints", KORD_JOINT_COUNT);
 
@@ -237,9 +258,18 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Establish connection to the robot using the adapter.
-  if (!kord_adapter_->connect())
+  try
   {
-    RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot via KordAdapter.");
+    RCLCPP_INFO(get_logger(), "Connecting to Kassow Kord robot at %s...", ip_address.c_str());
+    if (!kord_adapter_->connect())
+    {
+      RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot via KordAdapter.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
+  catch (const std::exception& e)
+  {
+    RCLCPP_FATAL(get_logger(), "Exception while connecting to Kassow Kord robot: %s", e.what());
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -292,8 +322,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  kord_adapter_->disconnect();
-
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
   return CallbackReturn::SUCCESS;
 }
@@ -308,7 +336,6 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     return hardware_interface::return_type::ERROR;
   }
 
-  // TODO(yara): isnt there really a better way to do this without creating and copying arrays?
   std::array<double, KORD_JOINT_COUNT> position_states{};
   std::array<double, KORD_JOINT_COUNT> velocity_states{};
   std::array<double, KORD_JOINT_COUNT> torque_states{};
@@ -320,12 +347,9 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
-    RCLCPP_DEBUG(
-      get_logger(), "Read joint %zu: pos=%f, vel=%f, effort=%f", i,
-      position_states[i], velocity_states[i], torque_states[i]);
-    set_state(joint_names_[i] + "/position", position_states[i]);
-    set_state(joint_names_[i] + "/velocity", velocity_states[i]);
-    set_state(joint_names_[i] + "/effort", torque_states[i]);
+    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_POSITION, position_states[i]);
+    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_VELOCITY, velocity_states[i]);
+    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_EFFORT, torque_states[i]);
   }
 
   return hardware_interface::return_type::OK;
@@ -337,9 +361,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
   for (size_t i = 0; i < joint_names_.size(); ++i)
   {
-    position_cmds[i] = get_command(joint_names_[i] + "/position");
-    RCLCPP_DEBUG(
-      get_logger(), "Command for joint %s: %f", joint_names_[i].c_str(), position_cmds[i]);
+    position_cmds[i] = get_command(joint_names_[i] + "/" + hardware_interface::HW_IF_POSITION);
   }
   if (!kord_adapter_->writeJointPositions(position_cmds))
   {

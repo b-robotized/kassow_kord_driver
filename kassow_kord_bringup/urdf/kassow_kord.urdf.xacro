@@ -7,10 +7,8 @@
   <!-- Minimal 7-DOF serial manipulator URDF (no visuals/collisions) -->
 
   <!-- Base link -->
-  <link name="base_link">
-    <xacro:default_inertial/>
-  </link>
-
+  <link name="base_link"/>
+  
   <!-- 7 links + 7 revolute joints -->
   <!-- links spaced along the +X axis by 0.2 m each -->
   <!-- joint axes use Z (common for many manipulators) -->

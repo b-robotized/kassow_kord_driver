@@ -55,7 +55,7 @@ pluginlib_export_plugin_description_file(
 install(
   TARGETS
   ${PROJECT_NAME}
-  DESTINATION lib/${PROJECT_NAME}
+  DESTINATION lib
 )
 
 install(
