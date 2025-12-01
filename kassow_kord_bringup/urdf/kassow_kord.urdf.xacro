@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
+
+  <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/inertials.xacro" />
+  <xacro:include filename="$(find kassow_kord_bringup)/urdf/kassow_kord.ros2_control.xacro"/>
+
+  <!-- Minimal 7-DOF serial manipulator URDF (no visuals/collisions) -->
+
+  <!-- Base link -->
+  <link name="base_link">
+    <xacro:default_inertial/>
+  </link>
+
+  <!-- 7 links + 7 revolute joints -->
+  <!-- links spaced along the +X axis by 0.2 m each -->
+  <!-- joint axes use Z (common for many manipulators) -->
+  <xacro:macro name="simple_link" params="idx length">
+    <link name="link_${idx}">
+      <xacro:default_inertial/>
+    </link>
+    <joint name="joint_${idx}" type="revolute">
+      <origin xyz="${length} 0 0" rpy="0 0 0"/>
+      <parent link="link_${idx - 1}"/>
+      <child link="link_${idx}"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="20.0" velocity="1.0" lower="-3.1416" upper="3.1416"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="link_0"/>
+  <joint name="joint_0_base" type="fixed">
+    <parent link="base_link"/>
+    <child link="link_0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- generate 7 links using the macro; use length 0.2 for each segment -->
+  <xacro:simple_link idx="1" length="0.2"/>
+  <xacro:simple_link idx="2" length="0.2"/>
+  <xacro:simple_link idx="3" length="0.2"/>
+  <xacro:simple_link idx="4" length="0.2"/>
+  <xacro:simple_link idx="5" length="0.2"/>
+  <xacro:simple_link idx="6" length="0.2"/>
+  <xacro:simple_link idx="7" length="0.2"/>
+
+  <!-- Add ros2_control hardware -->
+  <xacro:kassow_kord_ros2_control name="kassow_kord_dummy"/>
+
+</robot>
