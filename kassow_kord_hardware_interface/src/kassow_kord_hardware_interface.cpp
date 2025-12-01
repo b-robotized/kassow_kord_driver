@@ -83,13 +83,56 @@ bool KordAdapter::connect()
   return connected_;
 }
 
-// TODO
-bool KordAdapter::reset_alarms()
+// clean all alarms
+bool KordAdapter::clean_alarms()
 {
   if (!connected_)
     return false;
 
-  // Reset alarms logic here
+  std::map<kr2::kord::ControlInterface::EClearRequest, std::string> commands_mapped = {
+    { kr2::kord::ControlInterface::EClearRequest::CLEAR_HALT, "CLEAR_HALT" },
+    { kr2::kord::ControlInterface::EClearRequest::CBUN_EVENT, "CBUN_EVENT" },
+    { kr2::kord::ControlInterface::EClearRequest::CONTINUE_INIT, "CONTINUE_INIT" },
+    { kr2::kord::ControlInterface::EClearRequest::UNSUSPEND, "UNSUSPEND" }
+  };
+
+  for (const auto &kv : commands_mapped)
+  {
+    const auto command = kv.first;
+    const auto &name = kv.second;
+    int64_t token = ctl_iface_->clearAlarmRequest(command);
+
+    RCLCPP_INFO(rclcpp::get_logger("KassowKordAdapter"),
+          "%s command sent with token: %lld",
+          name.c_str(),
+          static_cast<long long>(token));
+
+    // Poll for command status -- blocking
+    while (rcv_iface_->getCommandStatus(token) == -1) {
+      if (!kord_->waitSync(std::chrono::milliseconds(10), kr2::kord::F_SYNC_FULL_ROTATION)) {
+        RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "Sync wait timed out, exiting.");
+        return false;
+      }
+
+      rcv_iface_->fetchData();
+    }
+
+    // Retrieve and log the command status
+    auto status = rcv_iface_->getCommandStatus(token);
+    if (status != -1)
+    {
+      RCLCPP_INFO(rclcpp::get_logger("KassowKordAdapter"), "%s command status: %d",
+                  name.c_str(),
+                  static_cast<int>(status));
+    } 
+    else
+    {
+      RCLCPP_WARN(rclcpp::get_logger("KassowKordAdapter"), "%s command status remains unknown.",
+                  name.c_str());
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -297,7 +340,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   // Reset robot errors and alarms as needed 
   try 
   {
-    if (!kord_adapter_->reset_alarms())
+    if (!kord_adapter_->clean_alarms())
     {
       RCLCPP_FATAL(get_logger(), "Failed to reset alarms to Kassow Kord robot via KordAdapter.");
       return hardware_interface::CallbackReturn::ERROR;

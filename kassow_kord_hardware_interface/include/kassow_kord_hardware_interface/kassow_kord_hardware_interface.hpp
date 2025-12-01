@@ -61,8 +61,8 @@ public:
   // Wait for sync (blocking with timeout configured in init)
   bool waitSync();
 
-  // Reset alarms
-  bool reset_alarms();
+  // Reset all alarms
+  bool clean_alarms();
 
   // Read joint states. All arrays must have size KORD_JOINT_COUNT.
   bool readJointStates(std::array<double, KORD_JOINT_COUNT>& positions,
