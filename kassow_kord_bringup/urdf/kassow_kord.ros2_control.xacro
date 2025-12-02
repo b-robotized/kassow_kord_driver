@@ -10,7 +10,6 @@
         <param name="port">7582</param>
         <param name="session_id">1</param>
         <param name="waitSync_timeout_ms">500</param>
-        <param name="realtime_priority">0</param>
       </hardware>
       
       <joint name="joint_1">
