@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" ?>
+<?xml version="1.0" ?>
 <robot name="kr2_robot_a810" model="a810" model-revision="051020-0" mechanical-revision="5" features="TIO" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="kr810_description">
@@ -16,11 +16,11 @@
   <material name="light_gray">
     <color rgba="0.7 0.7 0.7 1.0"/>
   </material>
-  
+
   <material name="black">
     <color rgba="0.1 0.1 0.1 1.0"/>
   </material>
-  
+
   <material name="orange">
     <color rgba="${255/255} ${108/255} ${10/255} 1.0"/>
   </material>
@@ -137,7 +137,7 @@
                                 material="gray">
       <cylinder length="${link1_radius * 1.7}" radius="${link1_radius}"/>
     </xacro:visual_and_collision>
-    
+
     <xacro:visual_and_collision rpy="0 ${pi/4} 0"
                                 xyz="${20 * scale} ${+8 * scale} ${200 * scale}"
                                 material="light_gray">
@@ -172,20 +172,20 @@
     <xacro:property name="cylinderJ2_height"   value="${120 * scale}"   />
     <xacro:property name="linkJ2_mass"         value="6.1"   />
 
-    <xacro:visual_and_collision rpy="${pi/2} 0 0" 
+    <xacro:visual_and_collision rpy="${pi/2} 0 0"
                                 xyz="0 ${-10 * scale} 0"
                                 material="orange">
       <cylinder length="${cylinderJ2_height * 1.25}" radius="${cylinderJ2_radius}"/>
     </xacro:visual_and_collision>
-    
+
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <mass value="${linkJ2_mass*mass_multiplier}"/>
       <xacro:cylinder_inertia mass="${linkJ2_mass}"
-                              radius="${cylinderJ2_radius}" 
+                              radius="${cylinderJ2_radius}"
                               length="${cylinderJ2_height}" />
     </inertial>
-       
+
   </link>
 
   <link name="link2">
@@ -194,7 +194,7 @@
     <xacro:property name="link2_length"   value="${ 274.0 * scale}"   />
 
     <xacro:property name="link2_mass"     value="0.43"   />
-    
+
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 ${ 175.0 * scale }"/>
       <mass value="${link2_mass*mass_multiplier}"/>
@@ -233,7 +233,7 @@
                               radius="${link3_radius}"
                               length="${link3_length}" />
     </inertial>
-    
+
     <visual>
         <origin xyz="-0.05 -0.0 0.315" rpy="${pi/2} 0 -${pi/2}" />
         <geometry>
@@ -252,20 +252,20 @@
     <xacro:property name="cylinderJ4_height"   value="${100 * scale}"   />
     <xacro:property name="linkJ4_mass"         value="3.8"   />
 
-    <xacro:visual_and_collision rpy="${pi/2} 0 0" 
+    <xacro:visual_and_collision rpy="${pi/2} 0 0"
                                 xyz="0 ${13 * scale} 0"
                                 material="orange">
       <cylinder length="${cylinderJ4_height * 1.29}" radius="${cylinderJ4_radius}"/>
     </xacro:visual_and_collision>
-    
+
     <inertial>
       <origin rpy="0 0 0" xyz="0 ${6.5 * scale} 0"/>
       <mass value="${linkJ4_mass*mass_multiplier}"/>
       <xacro:cylinder_inertia mass="${linkJ4_mass}"
-                              radius="${cylinderJ4_radius}" 
+                              radius="${cylinderJ4_radius}"
                               length="${cylinderJ4_height}" />
     </inertial>
-    
+
   </link>
 
   <link name="link4">
@@ -282,7 +282,7 @@
                               radius="${link4_radius}"
                               length="${link4_length}" />
     </inertial>
-    
+
     <visual>
         <origin xyz="0.04 0.0005 0.0" rpy="-${pi/2} 0 ${pi/2}" />
         <geometry>
@@ -329,7 +329,7 @@
     <xacro:property name="cylinderJ6_height"   value="${ 110.0 * scale}"  />
     <xacro:property name="linkJ6_mass"         value="1.8"   />
     <!--
-    <xacro:visual_and_collision rpy="${pi/2} 0 0" 
+    <xacro:visual_and_collision rpy="${pi/2} 0 0"
                                 xyz="0 ${10 * scale} 0"
                                 material="orange">
       <cylinder length="${cylinderJ6_height * 1.9}" radius="${cylinderJ6_radius}"/>
@@ -339,10 +339,10 @@
       <origin rpy="0 0 0" xyz="0 ${4.0 * scale} 0"/>
       <mass value="${linkJ6_mass*mass_multiplier}"/>
       <xacro:cylinder_inertia mass="${linkJ6_mass}"
-                              radius="${cylinderJ6_radius}" 
+                              radius="${cylinderJ6_radius}"
                               length="${cylinderJ6_height}" />
     </inertial>
-    
+
   </link>
 
   <link name="link6">
@@ -475,7 +475,7 @@
     <child link="link4"/>
     <origin rpy="0 0 0" xyz="${jointPL4_xoffset} ${jointPL4_yoffset} ${jointPL4_zoffset}"/>
   </joint>
-  
+
   <joint name="joint_5" type="continuous">
     <parent link="link4"/>
     <child link="link5"/>
