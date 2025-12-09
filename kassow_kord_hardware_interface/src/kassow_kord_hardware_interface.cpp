@@ -57,7 +57,7 @@ KordAdapter::KordAdapter(
     session_id);
 }
 
-// TODO: put in on cleanup
+// TODO(yara): put in on cleanup
 KordAdapter::~KordAdapter()
 {
   // Best-effort disconnect in destructor; swallow exceptions.
@@ -103,7 +103,7 @@ bool KordAdapter::clean_alarms()
 
     RCLCPP_INFO(
       rclcpp::get_logger("KassowKordAdapter"), "%s command sent with token: %lld", name.c_str(),
-      static_cast<long long>(token));
+      static_cast<int64_t>(token));
 
     // Poll for command status -- blocking
     while (rcv_iface_->getCommandStatus(token) == -1)
@@ -191,7 +191,7 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmd
   return true;
 }
 
-// TODO
+// TODO(yara): put in on cleanup
 void KordAdapter::disconnect() { connected_ = false; }
 
 // -----------------------------

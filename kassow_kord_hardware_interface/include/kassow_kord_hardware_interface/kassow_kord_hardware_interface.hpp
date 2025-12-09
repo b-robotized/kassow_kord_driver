@@ -13,6 +13,12 @@
 #ifndef KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
 #define KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
 
+#include <kord/api/kord.h>
+#include <kord/api/kord_control_interface.h>
+#include <kord/api/kord_receive_interface.h>
+#include <kord/utils/utils.h>
+#include <kord/version.h>
+
 #include <cstring>
 #include <iostream>
 #include <limits>
@@ -27,12 +33,6 @@
 #include "rclcpp/macros.hpp"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
-
-#include <kord/api/kord.h>
-#include <kord/api/kord_control_interface.h>
-#include <kord/api/kord_receive_interface.h>
-#include <kord/utils/utils.h>
-#include <kord/version.h>
 
 namespace kassow_kord_hardware_interface
 {
