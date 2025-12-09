@@ -28,13 +28,11 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
-#include <kord/api/kord.h> 
-#include <kord/version.h>
+#include <kord/api/kord.h>
 #include <kord/api/kord_control_interface.h>
 #include <kord/api/kord_receive_interface.h>
-#include <kord/api/kord_receive_interface.h>
 #include <kord/utils/utils.h>
-
+#include <kord/version.h>
 
 namespace kassow_kord_hardware_interface
 {
@@ -43,11 +41,7 @@ const size_t KORD_JOINT_COUNT = 7;
 class KordAdapter
 {
 public:
-  KordAdapter(
-  const std::string & ip_address,
-  int port,
-  int session_id,
-  int waitSync_timeout_ms);
+  KordAdapter(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms);
   ~KordAdapter();
 
   // Initialize underlying kord connection resources. Returns true on success.
@@ -65,12 +59,13 @@ public:
   bool clean_alarms();
 
   // Read joint states. All arrays must have size KORD_JOINT_COUNT.
-  bool readJointStates(std::array<double, KORD_JOINT_COUNT>& positions,
-                       std::array<double, KORD_JOINT_COUNT>& velocities,
-                       std::array<double, KORD_JOINT_COUNT>& efforts);
+  bool readJointStates(
+    std::array<double, KORD_JOINT_COUNT> & positions,
+    std::array<double, KORD_JOINT_COUNT> & velocities,
+    std::array<double, KORD_JOINT_COUNT> & efforts);
 
   // Write joint position commands (size KORD_JOINT_COUNT).
-  bool writeJointPositions(const std::array<double, KORD_JOINT_COUNT>& position_cmds);
+  bool writeJointPositions(const std::array<double, KORD_JOINT_COUNT> & position_cmds);
 
   // Lightweight configuration helper
   void configure(int waitSync_timeout_ms);
