@@ -108,7 +108,9 @@ public:
 
 private:
   std::shared_ptr<KordAdapter> kord_adapter_;
-  std::array<std::string, KORD_JOINT_COUNT> joint_names_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_position_itfs_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_velocity_itfs_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_effort_itfs_;
   std::string ip_address;
 };
 
