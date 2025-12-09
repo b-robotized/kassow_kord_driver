@@ -10,8 +10,8 @@
 // use and change right, except distributing this library separately
 // of their product.
 
-#ifndef kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
-#define kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
+#ifndef KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
+#define KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
 
 #include <cstring>
 #include <iostream>
@@ -111,4 +111,4 @@ private:
 
 }  // namespace kassow_kord_hardware_interface
 
-#endif  // kassow_kord_hardware_interface__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
+#endif  // KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_KORD_HARDWARE_INTERFACE_HPP_
