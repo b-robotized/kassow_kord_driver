@@ -285,7 +285,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
       return hardware_interface::CallbackReturn::ERROR;
     }
 
-    joint_names_[joint_index] = joint.name;
+    joint_position_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_POSITION;
+    joint_velocity_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_VELOCITY;
+    joint_effort_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_EFFORT;
     joint_index++;
   }
 
@@ -345,10 +347,10 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     std::array<double, KORD_JOINT_COUNT> initial_velocities{};
     std::array<double, KORD_JOINT_COUNT> initial_torques{};
     kord_adapter_->readJointStates(initial_positions, initial_velocities, initial_torques);
-    for (size_t i = 0; i < joint_names_.size(); ++i)
+    for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
     {
-      RCLCPP_INFO(get_logger(), "Initial position for joint %s: %f", joint_names_[i].c_str(), initial_positions[i]);
-      set_command(joint_names_[i] + "/position", initial_positions[i]);
+      RCLCPP_INFO(get_logger(), "Initial position for interface %s: %f", joint_position_itfs_[i].c_str(), initial_positions[i]);
+      set_command(joint_position_itfs_[i], initial_positions[i]);
     }
   } 
   catch (const std::exception& e) 
@@ -390,9 +392,9 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
-    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_POSITION, position_states[i]);
-    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_VELOCITY, velocity_states[i]);
-    set_state(joint_names_[i] + "/" + hardware_interface::HW_IF_EFFORT, torque_states[i]);
+    set_state(joint_position_itfs_[i], position_states[i]);
+    set_state(joint_velocity_itfs_[i], velocity_states[i]);
+    set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
   return hardware_interface::return_type::OK;
@@ -402,9 +404,9 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
-  for (size_t i = 0; i < joint_names_.size(); ++i)
+  for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
-    position_cmds[i] = get_command(joint_names_[i] + "/" + hardware_interface::HW_IF_POSITION);
+    position_cmds[i] = get_command(joint_position_itfs_[i]);
   }
   if (!kord_adapter_->writeJointPositions(position_cmds))
   {
