@@ -26,7 +26,7 @@
  */
 namespace kassow_kord_hardware_interface
 {
-constexpr double TT_VALUE = 5.0;  // tracking time - TODO(yara): make configurable
+constexpr double TT_VALUE = 5.0;
 constexpr double BT_VALUE = 3.0;  // blend time - TODO(yara): make configurable
 
 // -----------------------------
@@ -57,16 +57,15 @@ KordAdapter::KordAdapter(
     session_id);
 }
 
-// TODO(yara): put in on cleanup
 KordAdapter::~KordAdapter()
 {
-  // Best-effort disconnect in destructor; swallow exceptions.
   try
   {
     disconnect();
   }
-  catch (...)
+  catch (const std::exception & e)
   {
+    RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "Exception in destructor: %s", e.what());
   }
 }
 
@@ -102,7 +101,7 @@ bool KordAdapter::clean_alarms()
     int64_t token = ctl_iface_->clearAlarmRequest(command);
 
     RCLCPP_INFO(
-      rclcpp::get_logger("KassowKordAdapter"), "%s command sent with token: %lld", name.c_str(),
+      rclcpp::get_logger("KassowKordAdapter"), "%s command sent with token: %ld", name.c_str(),
       static_cast<int64_t>(token));
 
     // Poll for command status -- blocking
@@ -191,8 +190,11 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmd
   return true;
 }
 
-// TODO(yara): put in on cleanup
-void KordAdapter::disconnect() { connected_ = false; }
+void KordAdapter::disconnect()
+{
+  connected_ = false;
+  kord_->disconnect();
+}
 
 // -----------------------------
 // KassowKordHardwareInterface implementation
@@ -313,6 +315,33 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   RCLCPP_INFO(
     get_logger(), "KassowKordHardwareInterface on_init completed for %zu joints", KORD_JOINT_COUNT);
 
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "cleanup KassowKordHardwareInterface...");
+
+  if (kord_adapter_)
+  {
+    try
+    {
+      if (!kord_adapter_->clean_alarms())
+      {
+        RCLCPP_DEBUG(
+          get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
+      }
+
+      kord_adapter_->disconnect();
+    }
+    catch (const std::exception & e)
+    {
+      RCLCPP_ERROR(get_logger(), "Exception while cleaning up KordAdapter: %s", e.what());
+    }
+  }
+
+  RCLCPP_INFO(get_logger(), "Successfully cleaned up");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 

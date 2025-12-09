@@ -74,8 +74,8 @@ private:
   std::shared_ptr<kr2::kord::KordCore> kord_;
   std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
   std::unique_ptr<kr2::kord::ReceiverInterface> rcv_iface_;
-  bool connected_{false};
   int waitSync_timeout_ms_{500};
+  bool connected_{false};
 };
 
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
@@ -85,6 +85,9 @@ public:
 
   hardware_interface::CallbackReturn on_init(
     const hardware_interface::HardwareComponentInterfaceParams & params) override;
+
+  hardware_interface::CallbackReturn on_cleanup(
+    const rclcpp_lifecycle::State & previous_state) override;
 
   hardware_interface::CallbackReturn on_configure(
     const rclcpp_lifecycle::State & previous_state) override;
