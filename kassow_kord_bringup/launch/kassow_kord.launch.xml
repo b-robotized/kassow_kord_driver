@@ -16,8 +16,6 @@ limitations under the License.
 
 Source of this file are templates in
 [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
-
-Authors: Riyan Jose, Manuel Muth, Dr. Denis
 -->
 
 <launch>
@@ -67,20 +65,16 @@ Authors: Riyan Jose, Manuel Muth, Dr. Denis
   </node>
 
   <!--robot_controller_spawner-->
+  <node pkg="controller_manager" exec="spawner" output="screen" args="joint_state_broadcaster"/>
   <node pkg="controller_manager" exec="spawner" args="$(var robot_controller)"/>
   <node pkg="controller_manager" exec="spawner" args="$(var inactive_robot_controller) --inactive"/>
 
-  <!--joint_state_broadcaster spawner-->
-  <node pkg="controller_manager" exec="spawner" output="screen" args="joint_state_broadcaster"/>
   <node pkg="rqt_joint_trajectory_controller" exec="rqt_joint_trajectory_controller"/>
 
   <!-- Load MoveIt Configuration -->
   <let name="robot_description_semantic_content"
     value="$(command '$(find-exec xacro) $(find-pkg-share $(var configuration_package))/srdf/kassow_kord.srdf.xacro \
               prefix:=$(var prefix)')"/>
-
-  <!-- TODO: joint limits file -->
-  <!-- TODO: pilz_cartesian_limits file -->
 
   <!-- MoveIt node -->
   <node pkg="moveit_ros_move_group" exec="move_group" output="screen">
@@ -96,7 +90,7 @@ Authors: Riyan Jose, Manuel Muth, Dr. Denis
   </node>
 
   <!-- RViz2 -->
-  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var description_package))/kr810/rviz/view_robot.rviz --ros-args --log-level fatal">
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal">
     <param name="robot_description" value="$(var robot_description_content)"/>
     <param name="robot_description_semantic" value="$(var robot_description_semantic_content)"/>
     <param from="$(var kinematics_file_path)"/>

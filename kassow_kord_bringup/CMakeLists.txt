@@ -10,7 +10,7 @@ find_package(kassow_kord_hardware_interface REQUIRED)
 find_package(kassow_kord_description REQUIRED)
 
 install(
-  DIRECTORY config launch urdf
+  DIRECTORY config launch urdf srdf
   DESTINATION share/${PROJECT_NAME}
 )
 

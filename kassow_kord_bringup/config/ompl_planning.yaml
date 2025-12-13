@@ -13,36 +13,7 @@
         - default_planning_response_adapters/DisplayMotionPath
       start_state_max_bounds_error: 0.1
 
-      manipulator_left:
-        planner_configs:
-          - AnytimePathShortening
-          - SBL
-          - EST
-          - LBKPIECE
-          - BKPIECE
-          - KPIECE
-          - RRT
-          - RRTConnect
-          - RRTstar
-          - TRRT
-          - PRM
-          - PRMstar
-          - FMT
-          - BFMT
-          - PDST
-          - STRIDE
-          - BiTRRT
-          - LBTRRT
-          - BiEST
-          - ProjEST
-          - LazyPRM
-          - LazyPRMstar
-          - SPARS
-          - SPARStwo
-        # projection_evaluator: joints(group_1/joint_1,group_1/joint_2)
-        longest_valid_segment_fraction: 0.005
-
-      manipulator_centric:
+      manipulator:
         planner_configs:
           - AnytimePathShortening
           - SBL

@@ -1,5 +1,4 @@
-kassow_kord_hardware_interface
-==========================================
+# kassow_kord_hardware_interface
 
 ros2 control hardware interface for kassow kord robot.
 
@@ -7,3 +6,10 @@ ros2 control hardware interface for kassow kord robot.
 
 Pluginlib-Library: kassow_kord_hardware_interface
 Plugin: kassow_kord_hardware_interface/KassowKordHardwareInterface (hardware_interface::SystemInterface)
+
+
+# Resources
+
+- https://www.kassowrobots.com/downloads/product-manuals
+- https://kassowrobots.gitlab.io/kord-api-doc/index.html
+- https://gitlab.com/kassowrobots/kord-api
