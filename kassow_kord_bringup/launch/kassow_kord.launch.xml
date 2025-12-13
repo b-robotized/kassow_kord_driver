@@ -37,6 +37,9 @@ Source of this file are templates in
   <arg name="use_mock_hardware"
        default="false"
        description="Start robot with mock hardware mirroring command to its states."/>
+  <arg name="enable_rviz"
+       default="false"
+       description="Enable RViz visualization."/>
   <arg name="robot_controller"
        default="joint_trajectory_controller"
        description="Robot controller to start. Choices are: [forward_position_controller, joint_trajectory_controller]."/>
@@ -90,13 +93,15 @@ Source of this file are templates in
   </node>
 
   <!-- RViz2 -->
-  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal">
-    <param name="robot_description" value="$(var robot_description_content)"/>
-    <param name="robot_description_semantic" value="$(var robot_description_semantic_content)"/>
-    <param from="$(var kinematics_file_path)"/>
-    <param from="$(var ompl_planning_file_path)"/>
-    <param name="default_planning_pipeline" value="ompl"/>
-  </node>
+  <if value="$(var enable_rviz)">
+     <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal">
+          <param name="robot_description" value="$(var robot_description_content)"/>
+          <param name="robot_description_semantic" value="$(var robot_description_semantic_content)"/>
+          <param from="$(var kinematics_file_path)"/>
+          <param from="$(var ompl_planning_file_path)"/>
+          <param name="default_planning_pipeline" value="ompl"/>
+     </node>
+  </if>
 
 
 </launch>
