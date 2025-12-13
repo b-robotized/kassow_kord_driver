@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>kassow_kord_hardware_interface</depend>
+  <depend>kassow_kord_description</depend>
 
   <exec_depend>controller_manager</exec_depend>
 

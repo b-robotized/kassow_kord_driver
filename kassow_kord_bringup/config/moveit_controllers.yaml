@@ -1,0 +1,26 @@
+/**:
+  ros__parameters:
+    moveit_simple_controller_manager:
+      controller_names:
+        - position_trajectory_controller
+
+      position_trajectory_controller:
+        action_ns: follow_joint_trajectory
+        type: FollowJointTrajectory
+        default: true
+        joints:
+            - joint_1
+            - joint_2
+            - joint_3
+            - joint_4
+            - joint_5
+            - joint_6
+            - joint_7
+
+    moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+    ompl:
+      manipulator_centric:
+        projection_evaluator: joints(joint_1,joint_2)
+      manipulator_left:
+        projection_evaluator: joints(joint_1,joint_2)
