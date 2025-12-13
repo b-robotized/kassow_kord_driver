@@ -93,7 +93,7 @@ Source of this file are templates in
   </node>
 
   <!-- RViz2 -->
-  <if value="$(var enable_rviz)">
+  <group if="$(var enable_rviz)">
      <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal">
           <param name="robot_description" value="$(var robot_description_content)"/>
           <param name="robot_description_semantic" value="$(var robot_description_semantic_content)"/>
@@ -101,7 +101,7 @@ Source of this file are templates in
           <param from="$(var ompl_planning_file_path)"/>
           <param name="default_planning_pipeline" value="ompl"/>
      </node>
-  </if>
+  </group>
 
 
 </launch>
