@@ -38,7 +38,7 @@ Source of this file are templates in
        default="false"
        description="Start robot with mock hardware mirroring command to its states."/>
   <arg name="enable_rviz"
-       default="false"
+       default="true"
        description="Enable RViz visualization."/>
   <arg name="robot_controller"
        default="joint_trajectory_controller"
