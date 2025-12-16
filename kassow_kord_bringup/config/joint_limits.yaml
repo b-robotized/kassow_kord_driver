@@ -14,15 +14,15 @@
           min_position: -6.283  # -360° in radians
           max_position: 6.283   # +360° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 3.0
         joint_2:
           has_position_limits: true
-          min_position: -1.222  # -70° in radians
+          min_position: -1.22   # -70° in radians
           max_position: 3.141   # +180° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 5.0
         joint_3:
@@ -30,15 +30,15 @@
           min_position: -6.283  # -360° in radians
           max_position: 6.283   # +360° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 5.0
         joint_4:
           has_position_limits: true
-          min_position: -1.222  # -70° in radians
+          min_position: -1.22   # -70° in radians
           max_position: 3.141   # +180° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 3.0
         joint_5:
@@ -46,7 +46,7 @@
           min_position: -6.283  # -360° in radians
           max_position: 6.283   # +360° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 5.0
         joint_6:
@@ -54,7 +54,7 @@
           min_position: -6.283  # -360° in radians
           max_position: 6.283   # +360° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 7.0
         joint_7:
@@ -62,6 +62,6 @@
           min_position: -6.283  # -360° in radians
           max_position: 6.283   # +360° in radians
           has_velocity_limits: true
-          max_velocity: 3.927   # 225°/s in radians/s
+          max_velocity: 3.926   # 225°/s in radians/s
           has_acceleration_limits: true
           max_acceleration: 7.0

@@ -72,7 +72,7 @@ Source of this file are templates in
   <node pkg="controller_manager" exec="spawner" args="$(var robot_controller)"/>
   <node pkg="controller_manager" exec="spawner" args="$(var inactive_robot_controller) --inactive"/>
 
-  <node pkg="rqt_joint_trajectory_controller" exec="rqt_joint_trajectory_controller"/>
+  <!-- <node pkg="rqt_joint_trajectory_controller" exec="rqt_joint_trajectory_controller"/> -->
 
   <!-- Load MoveIt Configuration -->
   <let name="robot_description_semantic_content"

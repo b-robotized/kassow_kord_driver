@@ -336,7 +336,7 @@
     <axis xyz="0 0 1"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="204" velocity="${225/180*pi}" lower="${-2*pi}" upper="${2*pi}"/>
+    <limit effort="204" velocity="${radians(225)}" lower="${-2*pi}" upper="${2*pi}"/>
   </joint>
 
   <xacro:property name="joint1_xoffset"  value="${  50.0 * scale}" />
@@ -350,7 +350,7 @@
     <axis xyz="0 1 0"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="204" velocity="${225/180*pi}" lower="${-70.0 * pi_per_deg}" upper="${(180/180)*pi}"/>
+    <limit effort="204" velocity="${radians(225)}" lower="-${radians(70.0)}" upper="${pi}"/>
   </joint>
 
   <xacro:property name="jointPL2_xoffset"  value="${  -50.0 * scale}" />
@@ -369,7 +369,7 @@
     <axis xyz="0 0 1"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="85" velocity="${225/180*pi}" lower="${-2*pi}" upper="${2*pi}"/>
+    <limit effort="85" velocity="${radians(225)}" lower="${-2*pi}" upper="${2*pi}"/>
   </joint>
 
   <xacro:property name="joint3_xoffset"  value="${ 40.0 * scale}" />
@@ -383,7 +383,7 @@
     <axis xyz="0 1 0"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="85" velocity="${225/180*pi}" lower="${-70.0 * pi_per_deg}" upper="${(180/180)*pi}"/>
+    <limit effort="85" velocity="${radians(225)}" lower="-${radians(70.0)}" upper="${pi}"/>
   </joint>
 
   <xacro:property name="jointPL4_xoffset"  value="${ -40.0 * scale}" />
@@ -403,7 +403,7 @@
     <axis xyz="0 0 1"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="51" velocity="${225/180*pi}" lower="${-2*pi}" upper="${2*pi}"/>
+    <limit effort="51" velocity="${radians(225)}" lower="${-2*pi}" upper="${2*pi}"/>
   </joint>
 
   <xacro:property name="joint5_zoffset"  value="${ 103.5 * scale}" />
@@ -415,7 +415,7 @@
     <axis xyz="0 1 0"/>
 
     <dynamics damping="${joints_damping}"/>
-    <limit effort="51" velocity="${225/180*pi}" lower="${-2*pi}" upper="${2*pi}"/>
+    <limit effort="51" velocity="${radians(225)}" lower="${-2*pi}" upper="${2*pi}"/>
   </joint>
 
   <xacro:property name="jointPL6_yoffset"  value="${ 111.0 * scale}" />
@@ -435,7 +435,7 @@
 
     <dynamics damping="${joints_damping}"/>
 
-    <limit effort="51" velocity="${225/180*pi}" lower="${-2*pi}" upper="${2*pi}"/>
+    <limit effort="51" velocity="${radians(225)}" lower="${-2*pi}" upper="${2*pi}"/>
   </joint>
 
   </xacro:macro>
