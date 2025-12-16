@@ -26,7 +26,7 @@
  */
 namespace kassow_kord_hardware_interface
 {
-constexpr double TT_VALUE = 5.0;
+constexpr double TT_VALUE = 0.008;
 constexpr double BT_VALUE = 3.0;  // blend time - TODO(yara): make configurable
 
 // -----------------------------
@@ -174,7 +174,7 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmd
   try
   {
     if (!ctl_iface_->moveJ(
-          position_cmds, kr2::kord::TrackingType::TT_TIME, 0.008, kr2::kord::BlendType::BT_TIME,
+          position_cmds, kr2::kord::TrackingType::TT_NONE, TT_VALUE, kr2::kord::BlendType::BT_TIME,
           0.004, kr2::kord::OverlayType::OT_VIAPOINT))
     {
       return false;
