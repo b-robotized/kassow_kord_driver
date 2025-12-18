@@ -14,6 +14,8 @@
           <param name="port">7582</param>
           <param name="session_id">1</param>
           <param name="waitSync_timeout_ms">500</param>
+          <param name="tracking_time">0.016</param>
+          <param name="blending_time">0.008</param>
         </xacro:unless>
       </hardware>
 
