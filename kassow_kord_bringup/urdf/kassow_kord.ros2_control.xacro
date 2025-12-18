@@ -1,22 +1,25 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="kassow_kord_ros2_control" params="name prefix use_mock_hardware:=false">
+  <xacro:macro name="kassow_kord_ros2_control"
+              params="name
+                      prefix
+                      use_mock_hardware:=false
+                      ip_address:=10.28.28.11
+                      port:=7582
+                      session_id:=1"
+                      >
 
-    <ros2_control name="${name}" type="system">
+    <ros2_control name="${name}" type="system" is_async="false" rw_rate="250">
       <hardware>
         <xacro:if value="$(arg use_mock_hardware)">
           <plugin>mock_components/GenericSystem</plugin>
         </xacro:if>
         <xacro:unless value="$(arg use_mock_hardware)">
           <plugin>kassow_kord_hardware_interface/KassowKordHardwareInterface</plugin>
-          <param name="ip_address">10.28.28.11</param>
-          <param name="port">7582</param>
-          <param name="session_id">1</param>
-          <param name="waitSync_timeout_ms">500</param>
-          <param name="tracking_time">0.008</param>
-          <param name="blending_time">0.004</param>
-          <param name="realtime_priority">1</param>
+          <param name="ip_address">${ip_address}</param>
+          <param name="port">${port}</param>
+          <param name="session_id">${session_id}</param>
         </xacro:unless>
       </hardware>
 

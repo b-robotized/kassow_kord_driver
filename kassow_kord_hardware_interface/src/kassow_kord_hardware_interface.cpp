@@ -23,7 +23,6 @@
  *   - port (int, optional, default=7582): Port number for Kord connection.
  *   - session_id (int, optional, default=1): Kord session ID.
  *   - waitSync_timeout_ms (int, optional, default=500): Timeout for waitSync in milliseconds.
- *   - realtime_priority prior (int, optional, default=0)
  *   - tracking_time (double, optional, default=0.008)
  *   - blending_time (double, optional, default=0.004)
  */
@@ -241,26 +240,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     session_id = std::stoi(hw_params.at("session_id"));
   }
 
-  int waitSync_timeout_ms = 500;
-  if (hw_params.find("waitSync_timeout_ms") != hw_params.end())
-  {
-    waitSync_timeout_ms = std::stoi(hw_params.at("waitSync_timeout_ms"));
-  }
-
-  int realtime_priority = 0;
-  if (hw_params.find("realtime_priority") != hw_params.end())
-  {
-    realtime_priority = std::stoi(hw_params.at("realtime_priority"));
-    if (realtime_priority > 0)
-    {
-      if (!kr2::utils::realtime::init_realtime_params(realtime_priority))
-      {
-        RCLCPP_FATAL(get_logger(), "Failed to start with realtime priority");
-        return hardware_interface::CallbackReturn::ERROR;
-      }
-    }
-  }
-
   double tracking_time = 0.008;
   if (hw_params.find("tracking_time") != hw_params.end())
   {
@@ -377,6 +356,8 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_effort_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_EFFORT;
     joint_index++;
   }
+
+  int waitSync_timeout_ms = static_cast<int>(std::ceil(1000.0 / params.hardware_info.rw_rate));
 
   // init adapter with joint count
   kord_adapter_ = std::make_shared<KordAdapter>(
@@ -501,6 +482,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   std::array<double, KORD_JOINT_COUNT> velocity_states{};
   std::array<double, KORD_JOINT_COUNT> acceleration_states{};
   std::array<double, KORD_JOINT_COUNT> torque_states{};
+
+  if (!kord_adapter_->waitSync())
+  {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
+    return hardware_interface::return_type::ERROR;
+  }
+
   if (!kord_adapter_->readJointStates(
         position_states, velocity_states, acceleration_states, torque_states))
   {
@@ -523,12 +511,6 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  if (!kord_adapter_->waitSync())
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
-    return hardware_interface::return_type::ERROR;
-  }
-
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
   std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
