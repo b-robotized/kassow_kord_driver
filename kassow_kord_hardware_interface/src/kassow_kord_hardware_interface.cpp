@@ -23,7 +23,7 @@
  *   - port (int, optional, default=7582): Port number for Kord connection.
  *   - session_id (int, optional, default=1): Kord session ID.
  *   - waitSync_timeout_ms (int, optional, default=500): Timeout for waitSync in milliseconds.
- *   - realtime_priority priot (int, optional, default=0)
+ *   - realtime_priority prior (int, optional, default=0)
  *   - tracking_time (double, optional, default=0.008)
  *   - blending_time (double, optional, default=0.004)
  */
@@ -246,15 +246,16 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
 
   int realtime_priority = 0;
-  if (hw_params.find("realtime_priority") != hw_params.end()) {
+  if (hw_params.find("realtime_priority") != hw_params.end())
+  {
     realtime_priority = std::stoi(hw_params.at("realtime_priority"));
     if (realtime_priority > 0)
     {
-      if (!kr2::utils::realtime::init_realtime_params(realtime_priority)) {
-          RCLCPP_FATAL(
-            get_logger(), "Failed to start with realtime priority");
-          return hardware_interface::CallbackReturn::ERROR;
-        }
+      if (!kr2::utils::realtime::init_realtime_params(realtime_priority))
+      {
+        RCLCPP_FATAL(get_logger(), "Failed to start with realtime priority");
+        return hardware_interface::CallbackReturn::ERROR;
+      }
     }
   }
 
