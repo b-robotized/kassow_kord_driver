@@ -26,16 +26,18 @@
  */
 namespace kassow_kord_hardware_interface
 {
-constexpr double TT_VALUE = 0.008;  // tracking time - TODO(yara): make configurable
-constexpr double BT_VALUE = 0.004;  // blend time - TODO(yara): make configurable
 
 // -----------------------------
 // KordAdapter method implementations
 // -----------------------------
 // Constructors
 KordAdapter::KordAdapter(
-  const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms)
-: waitSync_timeout_ms_(waitSync_timeout_ms), connected_(false)
+  const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms,
+  double tracking_time, double blending_time)
+: waitSync_timeout_ms_(waitSync_timeout_ms),
+  connected_(false),
+  tracking_time_(tracking_time),
+  blending_time_(blending_time)
 {
   try
   {
@@ -174,8 +176,8 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmd
   try
   {
     if (!ctl_iface_->moveJ(
-          position_cmds, kr2::kord::TrackingType::TT_NONE, TT_VALUE, kr2::kord::BlendType::BT_TIME,
-          BT_VALUE, kr2::kord::OverlayType::OT_VIAPOINT))
+          position_cmds, kr2::kord::TrackingType::TT_NONE, tracking_time_,
+          kr2::kord::BlendType::BT_TIME, blending_time_, kr2::kord::OverlayType::OT_VIAPOINT))
     {
       return false;
     }
@@ -238,6 +240,18 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   if (hw_params.find("waitSync_timeout_ms") != hw_params.end())
   {
     waitSync_timeout_ms = std::stoi(hw_params.at("waitSync_timeout_ms"));
+  }
+
+  double tracking_time = 0.008;
+  if (hw_params.find("tracking_time") != hw_params.end())
+  {
+    tracking_time = std::stoi(hw_params.at("tracking_time"));
+  }
+
+  double blending_time = 0.004;
+  if (hw_params.find("blending_time") != hw_params.end())
+  {
+    blending_time = std::stoi(hw_params.at("blending_time"));
   }
 
   if (info_.joints.size() != KORD_JOINT_COUNT)
@@ -310,7 +324,8 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
 
   // init adapter with joint count
-  kord_adapter_ = std::make_shared<KordAdapter>(ip_address, port, session_id, waitSync_timeout_ms);
+  kord_adapter_ = std::make_shared<KordAdapter>(
+    ip_address, port, session_id, waitSync_timeout_ms, tracking_time, blending_time);
 
   RCLCPP_INFO(
     get_logger(), "KassowKordHardwareInterface on_init completed for %zu joints", KORD_JOINT_COUNT);

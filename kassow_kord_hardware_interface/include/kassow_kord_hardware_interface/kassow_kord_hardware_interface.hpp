@@ -41,7 +41,9 @@ const size_t KORD_JOINT_COUNT = 7;
 class KordAdapter
 {
 public:
-  KordAdapter(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms);
+  KordAdapter(
+    const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms,
+    double tracking_time, double blending_time);
   ~KordAdapter();
 
   // Initialize underlying kord connection resources. Returns true on success.
@@ -76,6 +78,8 @@ private:
   std::unique_ptr<kr2::kord::ReceiverInterface> rcv_iface_;
   int waitSync_timeout_ms_{500};
   bool connected_{false};
+  double tracking_time_{0.008};
+  double blending_time_{0.004};
 };
 
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
