@@ -154,7 +154,7 @@ bool KordAdapter::waitSync()
 // reads joint states: positions (rad), velocities and efforts
 bool KordAdapter::readJointStates(
   std::array<double, 7> & positions, std::array<double, 7> & velocities,
-  std::array<double, 7> & efforts)
+  std::array<double, 7> & accelerations, std::array<double, 7> & efforts)
 {
   if (!connected_)
   {
@@ -165,11 +165,15 @@ bool KordAdapter::readJointStates(
   positions = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocities = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   efforts = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
+  accelerations =
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
 
   return true;
 }
 
-bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmds)
+bool KordAdapter::writeJointPositions(
+  const std::array<double, 7> & position_cmds, const std::array<double, 7> & velocity_cmds,
+  const std::array<double, 7> & acceleration_cmds)
 {
   if (!connected_)
   {
@@ -178,9 +182,7 @@ bool KordAdapter::writeJointPositions(const std::array<double, 7> & position_cmd
 
   try
   {
-    if (!ctl_iface_->moveJ(
-          position_cmds, kr2::kord::TrackingType::TT_NONE, tracking_time_,
-          kr2::kord::BlendType::BT_TIME, blending_time_, kr2::kord::OverlayType::OT_VIAPOINT))
+    if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
     {
       return false;
     }
@@ -283,23 +285,11 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   for (const hardware_interface::ComponentInfo & joint : info_.joints)
   {
     // Validate we have one position command interface
-    if (
-      joint.command_interfaces.size() != 1 ||
-      joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
+    if (joint.command_interfaces.size() != 3)
     {
       RCLCPP_FATAL(
         get_logger(),
-        "Joint '%s' command interface invalid. Expected exactly one position interface.",
-        joint.name.c_str());
-      return hardware_interface::CallbackReturn::ERROR;
-    }
-
-    // Validate we have three state interface
-    if (joint.state_interfaces.size() != 3)
-    {
-      RCLCPP_FATAL(
-        get_logger(),
-        "Joint '%s' state interface invalid. Expected exactly three state interfaces.",
+        "Joint '%s' command interface invalid. Expected exactly three command interfaces.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
     }
@@ -307,6 +297,47 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     // Validate state interfaces
     bool has_position = false;
     bool has_velocity = false;
+    bool has_acceleration = false;
+
+    for (const auto & command_interface : joint.command_interfaces)
+    {
+      if (command_interface.name == hardware_interface::HW_IF_POSITION)
+      {
+        has_position = true;
+      }
+      else if (command_interface.name == hardware_interface::HW_IF_VELOCITY)
+      {
+        has_velocity = true;
+      }
+      else if (command_interface.name == hardware_interface::HW_IF_ACCELERATION)
+      {
+        has_acceleration = true;
+      }
+    }
+
+    if (!has_position || !has_velocity || !has_acceleration)
+    {
+      RCLCPP_FATAL(
+        get_logger(),
+        "Joint '%s' missing required state interfaces. Expected position, velocity, and "
+        "acceleration.",
+        joint.name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    // Validate we have four state interface
+    if (joint.state_interfaces.size() != 4)
+    {
+      RCLCPP_FATAL(
+        get_logger(), "Joint '%s' state interface invalid. Expected exactly four state interfaces.",
+        joint.name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    // Validate state interfaces
+    has_position = false;
+    has_velocity = false;
+    has_acceleration = false;
     bool has_effort = false;
 
     for (const auto & state_interface : joint.state_interfaces)
@@ -319,23 +350,30 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
       {
         has_velocity = true;
       }
+      else if (state_interface.name == hardware_interface::HW_IF_ACCELERATION)
+      {
+        has_acceleration = true;
+      }
       else if (state_interface.name == hardware_interface::HW_IF_EFFORT)
       {
         has_effort = true;
       }
     }
 
-    if (!has_position || !has_velocity || !has_effort)
+    if (!has_position || !has_velocity || !has_acceleration || !has_effort)
     {
       RCLCPP_FATAL(
         get_logger(),
-        "Joint '%s' missing required state interfaces. Expected position, velocity, and effort.",
+        "Joint '%s' missing required state interfaces. Expected position, velocity, acceleration, "
+        "and effort.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
     }
 
     joint_position_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_POSITION;
     joint_velocity_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_VELOCITY;
+    joint_acceleration_itfs_[joint_index] =
+      joint.name + "/" + hardware_interface::HW_IF_ACCELERATION;
     joint_effort_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_EFFORT;
     joint_index++;
   }
@@ -423,14 +461,18 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   {
     std::array<double, KORD_JOINT_COUNT> initial_positions{};
     std::array<double, KORD_JOINT_COUNT> initial_velocities{};
+    std::array<double, KORD_JOINT_COUNT> initial_accelerations{};
     std::array<double, KORD_JOINT_COUNT> initial_torques{};
-    kord_adapter_->readJointStates(initial_positions, initial_velocities, initial_torques);
+    kord_adapter_->readJointStates(
+      initial_positions, initial_velocities, initial_accelerations, initial_torques);
     for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
     {
       RCLCPP_INFO(
         get_logger(), "Initial position for interface %s: %f", joint_position_itfs_[i].c_str(),
         initial_positions[i]);
       set_command(joint_position_itfs_[i], initial_positions[i]);
+      set_command(joint_velocity_itfs_[i], initial_velocities[i]);
+      set_command(joint_acceleration_itfs_[i], initial_accelerations[i]);
     }
   }
   catch (const std::exception & e)
@@ -457,8 +499,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 {
   std::array<double, KORD_JOINT_COUNT> position_states{};
   std::array<double, KORD_JOINT_COUNT> velocity_states{};
+  std::array<double, KORD_JOINT_COUNT> acceleration_states{};
   std::array<double, KORD_JOINT_COUNT> torque_states{};
-  if (!kord_adapter_->readJointStates(position_states, velocity_states, torque_states))
+  if (!kord_adapter_->readJointStates(
+        position_states, velocity_states, acceleration_states, torque_states))
   {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000, "KordAdapter failed to read states (using last known).");
@@ -469,6 +513,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   {
     set_state(joint_position_itfs_[i], position_states[i]);
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
+    set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
@@ -483,13 +528,17 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
     return hardware_interface::return_type::ERROR;
   }
-  
+
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
+  std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
+  std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
+    velocity_cmds[i] = get_command(joint_velocity_itfs_[i]);
+    acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
-  if (!kord_adapter_->writeJointPositions(position_cmds))
+  if (!kord_adapter_->writeJointPositions(position_cmds, velocity_cmds, acceleration_cmds))
   {
     RCLCPP_ERROR_THROTTLE(
       get_logger(), *get_clock(), 2000, "KordAdapter failed to write joint positions");

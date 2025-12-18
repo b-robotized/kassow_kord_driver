@@ -64,10 +64,14 @@ public:
   bool readJointStates(
     std::array<double, KORD_JOINT_COUNT> & positions,
     std::array<double, KORD_JOINT_COUNT> & velocities,
+    std::array<double, KORD_JOINT_COUNT> & accelerations,
     std::array<double, KORD_JOINT_COUNT> & efforts);
 
   // Write joint position commands (size KORD_JOINT_COUNT).
-  bool writeJointPositions(const std::array<double, KORD_JOINT_COUNT> & position_cmds);
+  bool writeJointPositions(
+    const std::array<double, KORD_JOINT_COUNT> & position_cmds,
+    const std::array<double, KORD_JOINT_COUNT> & velocity_cmds,
+    const std::array<double, KORD_JOINT_COUNT> & acceleration_cmds);
 
   // Lightweight configuration helper
   void configure(int waitSync_timeout_ms);
@@ -112,6 +116,7 @@ private:
   std::shared_ptr<KordAdapter> kord_adapter_;
   std::array<std::string, KORD_JOINT_COUNT> joint_position_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_velocity_itfs_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_acceleration_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_effort_itfs_;
   std::string ip_address;
 };
