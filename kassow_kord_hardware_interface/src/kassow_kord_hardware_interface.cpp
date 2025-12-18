@@ -455,12 +455,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
 hardware_interface::return_type KassowKordHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  if (!kord_adapter_->waitSync())
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
-    return hardware_interface::return_type::ERROR;
-  }
-
   std::array<double, KORD_JOINT_COUNT> position_states{};
   std::array<double, KORD_JOINT_COUNT> velocity_states{};
   std::array<double, KORD_JOINT_COUNT> torque_states{};
@@ -484,6 +478,12 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  if (!kord_adapter_->waitSync())
+  {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
+    return hardware_interface::return_type::ERROR;
+  }
+  
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
