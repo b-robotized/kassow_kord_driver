@@ -1,22 +1,25 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
-  <xacro:arg name="prefix" default=""/>
+  <xacro:arg name="prefix" default="kassow"/>
   <xacro:arg name="use_mock_hardware" default="true"/>
   <xacro:arg name="ip_address" default="10.28.28.11"/>
   <xacro:arg name="port" default="7582"/>
   <xacro:arg name="session_id" default="1"/>
 
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/inertials.xacro" />
+  <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/materials.xacro" />
   <xacro:include filename="$(find kassow_kord_description)/kr810/urdf/kr810_description.urdf.xacro"/>
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/kassow_kord.ros2_control.xacro"/>
+  
+  <link name="world"/>
 
-  <!-- Add robot URDF -->
-  <xacro:kr810_description/>
+  <xacro:kr810_description prefix="$(arg prefix)" parent="world">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:kr810_description>
 
-  <!-- Add ros2_control hardware -->
   <xacro:kassow_kord_ros2_control
-    name="kassow_kord_control"
+    name="$(arg prefix)"
     prefix="$(arg prefix)"
     use_mock_hardware="$(arg use_mock_hardware)"
     ip_address="$(arg ip_address)"

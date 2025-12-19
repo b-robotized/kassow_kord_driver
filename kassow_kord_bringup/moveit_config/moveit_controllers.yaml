@@ -3,6 +3,9 @@
     moveit_simple_controller_manager:
       controller_names:
         - joint_trajectory_controller
+        - kassow_joint_trajectory_controller
+        - kassow_left_joint_trajectory_controller
+        - kassow_right_joint_trajectory_controller
 
       joint_trajectory_controller:
         action_ns: follow_joint_trajectory
@@ -16,6 +19,45 @@
             - joint_5
             - joint_6
             - joint_7
+      
+      kassow_joint_trajectory_controller:
+        action_ns: follow_joint_trajectory
+        type: FollowJointTrajectory
+        default: true
+        joints:
+            - kassow_joint_1
+            - kassow_joint_2
+            - kassow_joint_3
+            - kassow_joint_4
+            - kassow_joint_5
+            - kassow_joint_6
+            - kassow_joint_7
+      
+      kassow_left_joint_trajectory_controller:
+        action_ns: follow_joint_trajectory
+        type: FollowJointTrajectory
+        default: true
+        joints:
+            - kassow_left_joint_1
+            - kassow_left_joint_2
+            - kassow_left_joint_3
+            - kassow_left_joint_4
+            - kassow_left_joint_5
+            - kassow_left_joint_6
+            - kassow_left_joint_7
+      
+      kassow_right_joint_trajectory_controller:
+        action_ns: follow_joint_trajectory
+        type: FollowJointTrajectory
+        default: true
+        joints:
+            - kassow_right_joint_1
+            - kassow_right_joint_2
+            - kassow_right_joint_3
+            - kassow_right_joint_4
+            - kassow_right_joint_5
+            - kassow_right_joint_6
+            - kassow_right_joint_7
 
     moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
 

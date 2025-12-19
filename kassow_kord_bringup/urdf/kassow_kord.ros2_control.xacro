@@ -28,7 +28,7 @@
         </xacro:unless>
       </hardware>
 
-      <joint name="joint_1">
+      <joint name="${prefix}_joint_1">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -38,7 +38,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_2">
+      <joint name="${prefix}_joint_2">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -48,7 +48,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_3">
+      <joint name="${prefix}_joint_3">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -58,7 +58,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_4">
+      <joint name="${prefix}_joint_4">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -68,7 +68,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_5">
+      <joint name="${prefix}_joint_5">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -78,7 +78,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_6">
+      <joint name="${prefix}_joint_6">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
@@ -88,7 +88,7 @@
         <state_interface name="effort"/>
       </joint>
 
-      <joint name="joint_7">
+      <joint name="${prefix}_joint_7">
         <command_interface name="position"/>
         <command_interface name="velocity"/>
         <command_interface name="acceleration"/>
