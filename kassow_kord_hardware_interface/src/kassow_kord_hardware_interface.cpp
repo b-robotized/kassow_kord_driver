@@ -22,6 +22,7 @@
  *   - ip_address (string, required): IP address of the robot controller.
  *   - port (int, required): Port number for Kord connection.
  *   - session_id (int, required): Kord session ID.
+ *   - waitSync_timeout_ms (int, required): Kord session ID.
  */
 namespace kassow_kord_hardware_interface
 {
@@ -68,7 +69,15 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  waitSync_timeout_ms = static_cast<int>(std::ceil(1000.0 / params.hardware_info.rw_rate));
+  if (hw_params.find("waitSync_timeout_ms") != hw_params.end())
+  {
+    waitSync_timeout_ms = std::stoi(hw_params.at("waitSync_timeout_ms"));
+  }
+  else
+  {
+    RCLCPP_FATAL(get_logger(), "Parameter 'waitSync_timeout_ms' is required but not provided");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
 
   if (info_.joints.size() != KORD_JOINT_COUNT)
   {
@@ -271,7 +280,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
-    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QDD);
   torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
