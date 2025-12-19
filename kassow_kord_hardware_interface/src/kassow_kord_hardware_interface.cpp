@@ -203,13 +203,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
-
-hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
-  const rclcpp_lifecycle::State & /*previous_state*/)
-{
   // Reset robot errors and alarms as needed
   try
   {
@@ -231,14 +224,27 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
     rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
-
+  torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
+  
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
+    set_state(joint_position_itfs_[i], position_states[i]);
+    set_state(joint_velocity_itfs_[i], velocity_states[i]);
+    set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
+    set_state(joint_effort_itfs_[i], torque_states[i]);
+
     set_command(joint_position_itfs_[i], position_states[i]);
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
 
+  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
