@@ -205,7 +205,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  RCLCPP_INFO(get_logger(), "Connecting to Kassow Kord robot at %s...", ip_address.c_str());
+  RCLCPP_INFO(
+    get_logger(), "Connecting to Kassow Kord robot at ip %s | port %d | session id %d",
+    ip_address.c_str(), port, session_id);
   if (!kord_->connect())
   {
     RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot.");
@@ -234,7 +236,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   acceleration_states =
     rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
   torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
-  
+
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     set_state(joint_position_itfs_[i], position_states[i]);
