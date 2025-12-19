@@ -17,18 +17,6 @@
 # [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 #
 
-publisher_forward_position_controller:
-  ros__parameters:
-
-    controller_name: "forward_position_controller"
-    wait_sec_between_publish: 5
-
-    goal_names: ["pos1", "pos2", "pos3"]
-    pos1: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    pos2: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    pos3: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-
 publisher_joint_trajectory_controller:
   ros__parameters:
 

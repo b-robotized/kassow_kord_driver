@@ -17,7 +17,7 @@
 # [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 #
 
-controller_manager:
+b_controlled_box_cm:
   ros__parameters:
     update_rate: 250  # Hz
 
