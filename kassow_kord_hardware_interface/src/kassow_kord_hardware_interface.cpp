@@ -20,191 +20,11 @@
  * \brief Hardware interface for Kassow Kord robots using the kord-api.
  * params:
  *   - ip_address (string, required): IP address of the robot controller.
- *   - port (int, optional, default=7582): Port number for Kord connection.
- *   - session_id (int, optional, default=1): Kord session ID.
- *   - waitSync_timeout_ms (int, optional, default=500): Timeout for waitSync in milliseconds.
- *   - tracking_time (double, optional, default=0.008)
- *   - blending_time (double, optional, default=0.004)
+ *   - port (int, required): Port number for Kord connection.
+ *   - session_id (int, required): Kord session ID.
  */
 namespace kassow_kord_hardware_interface
 {
-
-// -----------------------------
-// KordAdapter method implementations
-// -----------------------------
-// Constructors
-KordAdapter::KordAdapter(
-  const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms,
-  double tracking_time, double blending_time)
-: waitSync_timeout_ms_(waitSync_timeout_ms),
-  connected_(false),
-  tracking_time_(tracking_time),
-  blending_time_(blending_time)
-{
-  try
-  {
-    kord_ = std::shared_ptr<kr2::kord::KordCore>(
-      new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
-
-    // Initialize Control and Receiver Interfaces.
-    ctl_iface_ = std::make_unique<kr2::kord::ControlInterface>(kord_);
-    rcv_iface_ = std::make_unique<kr2::kord::ReceiverInterface>(kord_);
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "KordAdapter initialization failed");
-  }
-
-  RCLCPP_INFO(
-    rclcpp::get_logger("KassowKordAdapter"),
-    "KordAdapter initialized for IP %s:%d with session ID %d", ip_address.c_str(), port,
-    session_id);
-}
-
-KordAdapter::~KordAdapter()
-{
-  try
-  {
-    disconnect();
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "Exception in destructor: %s", e.what());
-  }
-}
-
-bool KordAdapter::connect()
-{
-  if (!kord_->connect())
-  {
-    connected_ = false;
-    return connected_;
-  }
-  connected_ = true;
-  return connected_;
-}
-
-// clean all alarms
-bool KordAdapter::clean_alarms()
-{
-  if (!connected_)
-  {
-    return false;
-  }
-
-  std::map<kr2::kord::ControlInterface::EClearRequest, std::string> commands_mapped = {
-    {kr2::kord::ControlInterface::EClearRequest::CLEAR_HALT, "CLEAR_HALT"},
-    {kr2::kord::ControlInterface::EClearRequest::CBUN_EVENT, "CBUN_EVENT"},
-    {kr2::kord::ControlInterface::EClearRequest::CONTINUE_INIT, "CONTINUE_INIT"},
-    {kr2::kord::ControlInterface::EClearRequest::UNSUSPEND, "UNSUSPEND"}};
-
-  for (const auto & kv : commands_mapped)
-  {
-    const auto command = kv.first;
-    const auto & name = kv.second;
-    int64_t token = ctl_iface_->clearAlarmRequest(command);
-
-    RCLCPP_INFO(
-      rclcpp::get_logger("KassowKordAdapter"), "%s command sent with token: %ld", name.c_str(),
-      static_cast<int64_t>(token));
-
-    // Poll for command status -- blocking
-    while (rcv_iface_->getCommandStatus(token) == -1)
-    {
-      if (!kord_->waitSync(std::chrono::milliseconds(10), kr2::kord::F_SYNC_FULL_ROTATION))
-      {
-        RCLCPP_ERROR(rclcpp::get_logger("KassowKordAdapter"), "Sync wait timed out, exiting.");
-        return false;
-      }
-
-      rcv_iface_->fetchData();
-    }
-
-    // Retrieve and log the command status
-    auto status = rcv_iface_->getCommandStatus(token);
-    if (status != -1)
-    {
-      RCLCPP_INFO(
-        rclcpp::get_logger("KassowKordAdapter"), "%s command status: %d", name.c_str(),
-        static_cast<int>(status));
-    }
-    else
-    {
-      RCLCPP_WARN(
-        rclcpp::get_logger("KassowKordAdapter"), "%s command status remains unknown.",
-        name.c_str());
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool KordAdapter::waitSync()
-{
-  if (!connected_)
-  {
-    return false;
-  }
-
-  return kord_->waitSync(std::chrono::milliseconds(waitSync_timeout_ms_));
-}
-
-// reads joint states: positions (rad), velocities and efforts
-bool KordAdapter::readJointStates(
-  std::array<double, 7> & positions, std::array<double, 7> & velocities,
-  std::array<double, 7> & accelerations, std::array<double, 7> & efforts)
-{
-  if (!connected_)
-  {
-    return false;
-  }
-
-  rcv_iface_->fetchData();
-  positions = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
-  velocities = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
-  efforts = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
-  accelerations =
-    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
-
-  return true;
-}
-
-bool KordAdapter::writeJointPositions(
-  const std::array<double, 7> & position_cmds, const std::array<double, 7> & velocity_cmds,
-  const std::array<double, 7> & acceleration_cmds)
-{
-  if (!connected_)
-  {
-    return false;
-  }
-
-  try
-  {
-    if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
-    {
-      return false;
-    }
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("KassowKordAdapter"), "Exception in writeJointPositions: %s", e.what());
-    return false;
-  }
-
-  return true;
-}
-
-void KordAdapter::disconnect()
-{
-  connected_ = false;
-  kord_->disconnect();
-}
-
-// -----------------------------
-// KassowKordHardwareInterface implementation
-// -----------------------------
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 {
@@ -216,41 +36,39 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
 
   auto & hw_params = info_.hardware_parameters;
-  // Get required parameter IP address
-  if (hw_params.find("ip_address") == hw_params.end())
+
+  // Get required parameters
+  if (hw_params.find("ip_address") != hw_params.end())
+  {
+    ip_address = hw_params.at("ip_address");
+  }
+  else
   {
     RCLCPP_FATAL(get_logger(), "Parameter 'ip_address' is required but not provided");
     return hardware_interface::CallbackReturn::ERROR;
   }
-  else
-  {
-    ip_address = hw_params.at("ip_address");
-  }
 
-  // Get optional parameters with defaults
-  int port = 7582;
   if (hw_params.find("port") != hw_params.end())
   {
     port = std::stoi(hw_params.at("port"));
   }
+  else
+  {
+    RCLCPP_FATAL(get_logger(), "Parameter 'port' is required but not provided");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
 
-  int session_id = 1;
   if (hw_params.find("session_id") != hw_params.end())
   {
     session_id = std::stoi(hw_params.at("session_id"));
   }
-
-  double tracking_time = 0.008;
-  if (hw_params.find("tracking_time") != hw_params.end())
+  else
   {
-    tracking_time = std::stoi(hw_params.at("tracking_time"));
+    RCLCPP_FATAL(get_logger(), "Parameter 'session_id' is required but not provided");
+    return hardware_interface::CallbackReturn::ERROR;
   }
 
-  double blending_time = 0.004;
-  if (hw_params.find("blending_time") != hw_params.end())
-  {
-    blending_time = std::stoi(hw_params.at("blending_time"));
-  }
+  waitSync_timeout_ms = static_cast<int>(std::ceil(1000.0 / params.hardware_info.rw_rate));
 
   if (info_.joints.size() != KORD_JOINT_COUNT)
   {
@@ -274,27 +92,23 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     }
 
     // Validate state interfaces
-    bool has_position = false;
-    bool has_velocity = false;
-    bool has_acceleration = false;
+    int required_interfaces = 0;
 
     for (const auto & command_interface : joint.command_interfaces)
     {
-      if (command_interface.name == hardware_interface::HW_IF_POSITION)
+      if (
+        command_interface.name == hardware_interface::HW_IF_POSITION ||
+        command_interface.name == hardware_interface::HW_IF_VELOCITY ||
+        command_interface.name == hardware_interface::HW_IF_ACCELERATION)
       {
-        has_position = true;
-      }
-      else if (command_interface.name == hardware_interface::HW_IF_VELOCITY)
-      {
-        has_velocity = true;
-      }
-      else if (command_interface.name == hardware_interface::HW_IF_ACCELERATION)
-      {
-        has_acceleration = true;
+        if (++required_interfaces == 3)
+        {
+          break;
+        }
       }
     }
 
-    if (!has_position || !has_velocity || !has_acceleration)
+    if (required_interfaces != 3)
     {
       RCLCPP_FATAL(
         get_logger(),
@@ -314,32 +128,24 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     }
 
     // Validate state interfaces
-    has_position = false;
-    has_velocity = false;
-    has_acceleration = false;
-    bool has_effort = false;
+    required_interfaces = 0;
 
     for (const auto & state_interface : joint.state_interfaces)
     {
-      if (state_interface.name == hardware_interface::HW_IF_POSITION)
+      if (
+        state_interface.name == hardware_interface::HW_IF_POSITION ||
+        state_interface.name == hardware_interface::HW_IF_VELOCITY ||
+        state_interface.name == hardware_interface::HW_IF_ACCELERATION ||
+        state_interface.name == hardware_interface::HW_IF_EFFORT)
       {
-        has_position = true;
-      }
-      else if (state_interface.name == hardware_interface::HW_IF_VELOCITY)
-      {
-        has_velocity = true;
-      }
-      else if (state_interface.name == hardware_interface::HW_IF_ACCELERATION)
-      {
-        has_acceleration = true;
-      }
-      else if (state_interface.name == hardware_interface::HW_IF_EFFORT)
-      {
-        has_effort = true;
+        if (++required_interfaces == 4)
+        {
+          break;
+        }
       }
     }
 
-    if (!has_position || !has_velocity || !has_acceleration || !has_effort)
+    if (required_interfaces != 4)
     {
       RCLCPP_FATAL(
         get_logger(),
@@ -357,11 +163,12 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
-  int waitSync_timeout_ms = static_cast<int>(std::ceil(1000.0 / params.hardware_info.rw_rate));
+  kord_ = std::shared_ptr<kr2::kord::KordCore>(
+    new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
-  // init adapter with joint count
-  kord_adapter_ = std::make_shared<KordAdapter>(
-    ip_address, port, session_id, waitSync_timeout_ms, tracking_time, blending_time);
+  // Initialize Control and Receiver Interfaces.
+  ctl_iface_ = std::make_unique<kr2::kord::ControlInterface>(kord_);
+  rcv_iface_ = std::make_unique<kr2::kord::ReceiverInterface>(kord_);
 
   RCLCPP_INFO(
     get_logger(), "KassowKordHardwareInterface on_init completed for %zu joints", KORD_JOINT_COUNT);
@@ -374,23 +181,13 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
 {
   RCLCPP_INFO(get_logger(), "cleanup KassowKordHardwareInterface...");
 
-  if (kord_adapter_)
+  if (!clean_alarms())
   {
-    try
-    {
-      if (!kord_adapter_->clean_alarms())
-      {
-        RCLCPP_DEBUG(
-          get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
-      }
-
-      kord_adapter_->disconnect();
-    }
-    catch (const std::exception & e)
-    {
-      RCLCPP_ERROR(get_logger(), "Exception while cleaning up KordAdapter: %s", e.what());
-    }
+    RCLCPP_DEBUG(
+      get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
   }
+
+  kord_->disconnect();
 
   RCLCPP_INFO(get_logger(), "Successfully cleaned up");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -399,19 +196,10 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // Establish connection to the robot using the adapter.
-  try
+  RCLCPP_INFO(get_logger(), "Connecting to Kassow Kord robot at %s...", ip_address.c_str());
+  if (!kord_->connect())
   {
-    RCLCPP_INFO(get_logger(), "Connecting to Kassow Kord robot at %s...", ip_address.c_str());
-    if (!kord_adapter_->connect())
-    {
-      RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot via KordAdapter.");
-      return hardware_interface::CallbackReturn::ERROR;
-    }
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_FATAL(get_logger(), "Exception while connecting to Kassow Kord robot: %s", e.what());
+    RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot.");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -425,9 +213,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   // Reset robot errors and alarms as needed
   try
   {
-    if (!kord_adapter_->clean_alarms())
+    if (!clean_alarms())
     {
-      RCLCPP_FATAL(get_logger(), "Failed to reset alarms to Kassow Kord robot via KordAdapter.");
+      RCLCPP_FATAL(get_logger(), "Failed to reset alarms to Kassow Kord robot.");
       return hardware_interface::CallbackReturn::ERROR;
     }
   }
@@ -438,28 +226,17 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   }
 
   // Read initial joint positions and set them as the initial command values
-  try
+  rcv_iface_->fetchData();
+  position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
+  velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
+  acceleration_states =
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
+
+  for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
-    std::array<double, KORD_JOINT_COUNT> initial_positions{};
-    std::array<double, KORD_JOINT_COUNT> initial_velocities{};
-    std::array<double, KORD_JOINT_COUNT> initial_accelerations{};
-    std::array<double, KORD_JOINT_COUNT> initial_torques{};
-    kord_adapter_->readJointStates(
-      initial_positions, initial_velocities, initial_accelerations, initial_torques);
-    for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
-    {
-      RCLCPP_INFO(
-        get_logger(), "Initial position for interface %s: %f", joint_position_itfs_[i].c_str(),
-        initial_positions[i]);
-      set_command(joint_position_itfs_[i], initial_positions[i]);
-      set_command(joint_velocity_itfs_[i], initial_velocities[i]);
-      set_command(joint_acceleration_itfs_[i], initial_accelerations[i]);
-    }
-  }
-  catch (const std::exception & e)
-  {
-    RCLCPP_ERROR(get_logger(), "Failed to read initial state: %s", e.what());
-    return hardware_interface::CallbackReturn::ERROR;
+    set_command(joint_position_itfs_[i], position_states[i]);
+    set_command(joint_velocity_itfs_[i], velocity_states[i]);
+    set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
 
   RCLCPP_INFO(get_logger(), "Successfully activated!");
@@ -478,24 +255,18 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
 hardware_interface::return_type KassowKordHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  std::array<double, KORD_JOINT_COUNT> position_states{};
-  std::array<double, KORD_JOINT_COUNT> velocity_states{};
-  std::array<double, KORD_JOINT_COUNT> acceleration_states{};
-  std::array<double, KORD_JOINT_COUNT> torque_states{};
-
-  if (!kord_adapter_->waitSync())
+  if (!kord_->waitSync(std::chrono::milliseconds(waitSync_timeout_ms)))
   {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "KordAdapter waitSync timeout");
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord waitSync timeout");
     return hardware_interface::return_type::ERROR;
   }
 
-  if (!kord_adapter_->readJointStates(
-        position_states, velocity_states, acceleration_states, torque_states))
-  {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 2000, "KordAdapter failed to read states (using last known).");
-    return hardware_interface::return_type::OK;
-  }
+  rcv_iface_->fetchData();
+  position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
+  velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
+  acceleration_states =
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
+  torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
@@ -511,23 +282,66 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  std::array<double, KORD_JOINT_COUNT> position_cmds{};
-  std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
-  std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
     velocity_cmds[i] = get_command(joint_velocity_itfs_[i]);
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
-  if (!kord_adapter_->writeJointPositions(position_cmds, velocity_cmds, acceleration_cmds))
+
+  if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
   {
-    RCLCPP_ERROR_THROTTLE(
-      get_logger(), *get_clock(), 2000, "KordAdapter failed to write joint positions");
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
     return hardware_interface::return_type::ERROR;
   }
 
   return hardware_interface::return_type::OK;
+}
+
+// clean all alarms
+bool KassowKordHardwareInterface::clean_alarms()
+{
+  std::map<kr2::kord::ControlInterface::EClearRequest, std::string> commands_mapped = {
+    {kr2::kord::ControlInterface::EClearRequest::CLEAR_HALT, "CLEAR_HALT"},
+    {kr2::kord::ControlInterface::EClearRequest::CBUN_EVENT, "CBUN_EVENT"},
+    {kr2::kord::ControlInterface::EClearRequest::CONTINUE_INIT, "CONTINUE_INIT"},
+    {kr2::kord::ControlInterface::EClearRequest::UNSUSPEND, "UNSUSPEND"}};
+
+  for (const auto & kv : commands_mapped)
+  {
+    const auto command = kv.first;
+    const auto & name = kv.second;
+    int64_t token = ctl_iface_->clearAlarmRequest(command);
+
+    RCLCPP_INFO(
+      get_logger(), "%s command sent with token: %ld", name.c_str(), static_cast<int64_t>(token));
+
+    // Poll for command status -- blocking
+    while (rcv_iface_->getCommandStatus(token) == -1)
+    {
+      if (!kord_->waitSync(std::chrono::milliseconds(10), kr2::kord::F_SYNC_FULL_ROTATION))
+      {
+        RCLCPP_ERROR(get_logger(), "Sync wait timed out, exiting.");
+        return false;
+      }
+
+      rcv_iface_->fetchData();
+    }
+
+    // Retrieve and log the command status
+    auto status = rcv_iface_->getCommandStatus(token);
+    if (status != -1)
+    {
+      RCLCPP_INFO(get_logger(), "%s command status: %d", name.c_str(), static_cast<int>(status));
+    }
+    else
+    {
+      RCLCPP_WARN(get_logger(), "%s command status remains unknown.", name.c_str());
+      return false;
+    }
+  }
+
+  return true;
 }
 
 }  // namespace kassow_kord_hardware_interface

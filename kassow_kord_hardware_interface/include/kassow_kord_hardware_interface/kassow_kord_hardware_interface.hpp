@@ -38,54 +38,6 @@ namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
 
-class KordAdapter
-{
-public:
-  KordAdapter(
-    const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms,
-    double tracking_time, double blending_time);
-  ~KordAdapter();
-
-  // Initialize underlying kord connection resources. Returns true on success.
-  bool init(const std::string & ip_address, int port, int session_id, int waitSync_timeout_ms);
-
-  // Connect/disconnect
-  bool connect();
-  void disconnect();
-  bool isConnected() const { return connected_; }
-
-  // Wait for sync (blocking with timeout configured in init)
-  bool waitSync();
-
-  // Reset all alarms
-  bool clean_alarms();
-
-  // Read joint states. All arrays must have size KORD_JOINT_COUNT.
-  bool readJointStates(
-    std::array<double, KORD_JOINT_COUNT> & positions,
-    std::array<double, KORD_JOINT_COUNT> & velocities,
-    std::array<double, KORD_JOINT_COUNT> & accelerations,
-    std::array<double, KORD_JOINT_COUNT> & efforts);
-
-  // Write joint position commands (size KORD_JOINT_COUNT).
-  bool writeJointPositions(
-    const std::array<double, KORD_JOINT_COUNT> & position_cmds,
-    const std::array<double, KORD_JOINT_COUNT> & velocity_cmds,
-    const std::array<double, KORD_JOINT_COUNT> & acceleration_cmds);
-
-  // Lightweight configuration helper
-  void configure(int waitSync_timeout_ms);
-
-private:
-  std::shared_ptr<kr2::kord::KordCore> kord_;
-  std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
-  std::unique_ptr<kr2::kord::ReceiverInterface> rcv_iface_;
-  int waitSync_timeout_ms_{500};
-  bool connected_{false};
-  double tracking_time_{0.008};
-  double blending_time_{0.004};
-};
-
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
 {
 public:
@@ -113,12 +65,30 @@ public:
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
 private:
-  std::shared_ptr<KordAdapter> kord_adapter_;
+  bool clean_alarms();
+
+  std::shared_ptr<kr2::kord::KordCore> kord_;
+  std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
+  std::unique_ptr<kr2::kord::ReceiverInterface> rcv_iface_;
+
   std::array<std::string, KORD_JOINT_COUNT> joint_position_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_velocity_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_acceleration_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_effort_itfs_;
+
+  std::array<double, KORD_JOINT_COUNT> position_states{};
+  std::array<double, KORD_JOINT_COUNT> velocity_states{};
+  std::array<double, KORD_JOINT_COUNT> acceleration_states{};
+  std::array<double, KORD_JOINT_COUNT> torque_states{};
+
+  std::array<double, KORD_JOINT_COUNT> position_cmds{};
+  std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
+  std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
+
   std::string ip_address;
+  int session_id;
+  int port;
+  int waitSync_timeout_ms;
 };
 
 }  // namespace kassow_kord_hardware_interface
