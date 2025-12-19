@@ -26,7 +26,7 @@
        default="$(find-pkg-share $(var configuration_package))/srdf/kassow_kord.srdf.xacro"
        description="URDF/XACRO semantic description file with the robot."/>
   <arg name="prefix"
-       default=""
+       default="kassow"
        description="Prefix of the joint names, useful for multi-robot setup."/>
   <arg name="start_rviz"
        default="true"
