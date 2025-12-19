@@ -26,7 +26,7 @@ b_controlled_box_cm:
 
     joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
-    
+
     kassow_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
     kassow_left_joint_trajectory_controller:
@@ -94,7 +94,7 @@ kassow_joint_trajectory_controller:
     constraints:
       stopped_velocity_tolerance: 0.01 # Defaults to 0.01
       goal_time: 0.0 # Defaults to 0.0 (start immediately)
-    
+
 
 kassow_left_joint_trajectory_controller:
   ros__parameters:
