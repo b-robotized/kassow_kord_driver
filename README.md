@@ -15,8 +15,8 @@ Plugin: kassow_kord_hardware_interface/KassowKordHardwareInterface (hardware_int
 
 ### pc + kassow sim/robot
 
-1. sim: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml hardware:=kr810`
-   robot: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml hardware:=kr810 ip_address:=10.23.23.204`
+1. sim: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false`
+   robot: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204`
 
 2. To move, you have to options:
     a. move with rqt: `ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller`
@@ -36,8 +36,8 @@ Plugin: kassow_kord_hardware_interface/KassowKordHardwareInterface (hardware_int
 
 ### ctrlX + kassow sim/robot
 
-1. sim: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml hardware:=kr810`
-   robot: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml hardware:=kr810 ip_address:=10.23.23.204`
+1. sim: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false`
+   robot: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204`
 2. put on operating mode
 3. activate hardware: `ros2 control set_hardware_component_state -c /b_controlled_box_cm kassow_kord_control active`
 4. spawn joint state broadcaster: `ros2 run controller_manager spawner -c /b_controlled_box_cm -p ./src/kassow_kord_driver/kassow_kord_bringup/config/kassow_kord_controllers.yaml joint_state_broadcaster`

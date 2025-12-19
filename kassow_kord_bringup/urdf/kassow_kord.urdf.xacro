@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
   <xacro:arg name="prefix" default=""/>
-  <xacro:arg name="hardware" default="mock"/>
+  <xacro:arg name="use_mock_hardware" default="true"/>
   <xacro:arg name="ip_address" default="10.28.28.11"/>
   <xacro:arg name="port" default="7582"/>
   <xacro:arg name="session_id" default="1"/>
@@ -18,7 +18,7 @@
   <xacro:kassow_kord_ros2_control
     name="kassow_kord_control"
     prefix="$(arg prefix)"
-    hardware="$(arg hardware)"
+    use_mock_hardware="$(arg use_mock_hardware)"
     ip_address="$(arg ip_address)"
     port="$(arg port)"
     session_id="$(arg session_id)"

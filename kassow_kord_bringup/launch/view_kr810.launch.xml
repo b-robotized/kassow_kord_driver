@@ -21,10 +21,7 @@
 <launch>
   <arg name="configuration_package" default="kassow_kord_bringup"/>
   <arg name="prefix" default="" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
-  <arg name="hardware" default="mock" description="Choose the type of hardware to start. Options: mock, kr810.">
-    <choice value="mock"/>
-    <choice value="kr810"/>
-  </arg>
+  <arg name="use_mock_hardware" default="true" description="Whether to use mock hardware or real hardware."/>
   <arg name="ip_address" default="10.28.28.11" description="IP address of the robot."/>
   <arg name="port" default="7582" description="Port of the robot."/>
   <arg name="session_id" default="1" description="Session ID of the robot."/>
@@ -32,7 +29,7 @@
   <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_description.launch.xml">
     <arg name="description_package" value="$(var configuration_package)"/>
     <arg name="prefix" value="$(var prefix)"/>
-    <arg name="hardware" value="$(var hardware)"/>
+    <arg name="use_mock_hardware" value="$(var use_mock_hardware)"/>
     <arg name="ip_address" value="$(var ip_address)"/>
     <arg name="port" value="$(var port)"/>
     <arg name="session_id" value="$(var session_id)"/>

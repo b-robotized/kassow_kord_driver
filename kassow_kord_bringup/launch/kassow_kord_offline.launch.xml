@@ -23,13 +23,21 @@
   <arg name="start_rviz" default="true" description="Launch RViz visualization?"/>
   <arg name="default_planning_pipeline" default="ompl"/>
 
+  <arg name="use_mock_hardware" default="true" description="Whether to use mock hardware or real hardware."/>
+  <arg name="ip_address" default="10.28.28.11" description="IP address of the robot."/>
+  <arg name="port" default="7582" description="Port of the robot."/>
+  <arg name="session_id" default="1" description="Session ID of the robot."/>
+
   <include file="$(find-pkg-share $(var launch_package))/launch/kassow_kord_moveit.launch.xml">
     <arg name="default_planning_pipeline" value="$(var default_planning_pipeline)"/>
     <arg name="start_rviz" value="$(var start_rviz)"/>
   </include>
 
   <include file="$(find-pkg-share $(var launch_package))/launch/kassow_kord_bringup.launch.xml">
-    <arg name="hardware" value="mock"/>
+    <arg name="use_mock_hardware" value="$(var use_mock_hardware)"/>
+    <arg name="ip_address" value="$(var ip_address)"/>
+    <arg name="port" value="$(var port)"/>
+    <arg name="session_id" value="$(var session_id)"/>
     <arg name="start_rviz" value="false"/>
   </include>
 </launch>
