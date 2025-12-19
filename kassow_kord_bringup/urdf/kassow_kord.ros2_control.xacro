@@ -7,7 +7,8 @@
                       use_mock_hardware:=true
                       ip_address:=10.28.28.11
                       port:=7582
-                      session_id:=1"
+                      session_id:=1
+                      waitSync_timeout_ms:=8"
                       >
 
     <ros2_control name="${name}" type="system" is_async="false" rw_rate="250">
@@ -20,6 +21,7 @@
           <param name="ip_address">${ip_address}</param>
           <param name="port">${port}</param>
           <param name="session_id">${session_id}</param>
+          <param name="waitSync_timeout_ms">${waitSync_timeout_ms}</param>
         </xacro:unless>
       </hardware>
 
