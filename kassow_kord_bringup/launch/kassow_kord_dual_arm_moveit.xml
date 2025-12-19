@@ -23,7 +23,7 @@
          default="kassow_kord_bringup"
          description="The ROS package where we find the configuration files."/>
   <arg name="semantic_description_file_path"
-       default="$(find-pkg-share $(var configuration_package))/srdf/kassow_kord.srdf.xacro"
+       default="$(find-pkg-share $(var configuration_package))/srdf/kassow_kord_dual_arm.srdf.xacro"
        description="URDF/XACRO semantic description file with the robot."/>
   <arg name="prefix"
        default=""
@@ -32,7 +32,7 @@
        default="true"
        description="Launch RViz visualization with MoveIt2 config?"/>
   <arg name="rviz_file_path"
-       default="$(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz"
+       default="$(find-pkg-share $(var configuration_package))/config/kassow_kord_dual_arm.rviz"
        description="Rviz2 configuration file of the visualization."/>
   <!-- moveit -->
   <arg name="move_group_config_file_path"

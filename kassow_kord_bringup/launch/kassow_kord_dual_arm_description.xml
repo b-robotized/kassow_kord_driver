@@ -38,7 +38,7 @@
   <let name="robot_description" value="$(command '$(find-exec xacro) $(find-pkg-share $(var description_package))/urdf/$(var description_file).urdf.xacro \
                                         use_mock_hardware:=$(var use_mock_hardware) \
                                         robot_1_prefix:=$(var sim_prefix) \
-                                        robot_1_ip:=$(var sim_session_id) \
+                                        robot_1_ip:=$(var sim_ip_address) \
                                         robot_1_port:=$(var sim_port) \
                                         robot_1_session_id:=$(var sim_session_id) \
                                         robot_2_prefix:=$(var real_prefix) \

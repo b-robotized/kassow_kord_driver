@@ -20,6 +20,8 @@
 b_controlled_box_cm:
   ros__parameters:
     update_rate: 250  # Hz
+    hardware_components_initial_state:
+      unconfigured: ["kassow_left", "kassow_right"]
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster

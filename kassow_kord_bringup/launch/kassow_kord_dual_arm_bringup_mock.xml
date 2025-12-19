@@ -26,7 +26,7 @@
   <let name="prefix" value=""/>
   <let name="controllers_file_path" value="$(find-pkg-share $(var configuration_package))/config/kassow_kord_controllers.yaml"/>
 
-  <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_description_dual_arm.launch.xml"/>
+  <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_dual_arm_description.launch.xml"/>
 
   <node pkg="controller_manager" exec="ros2_control_node" name="b_controlled_box_cm" output="both">
     <param name="update_rate" value="250"/>
