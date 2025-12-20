@@ -5,10 +5,6 @@ This repository contains the configuration and setup for Kassow Kord control, wh
 > [!WARNING]
 > This repository is under heavy development. If some links break or if some instruction do not lead to a smooth experience, please contact the developers.
 
-Quick links:
-- Setup container for packages: [Setup container](#setup-container)
-- Quick demo to test the installation works: [Quick test of the setup](#quick-test-of-the-setup)
-
 ## Overview
 
 This package provides a complete software solution for controlling Kassow Kord Robot (KR810) with full hardware integration and motion planning capabilities. The package implements a custom hardware interface compatible with ros2_control, enabling seamless operation of both physical robot and simulated one.
@@ -18,6 +14,12 @@ This package provides a complete software solution for controlling Kassow Kord R
 - Control of Kassow KR810 collaborative robots through a custom hardware interface and Joint Trajectory Controller
 - Multi-robot setup to control both real and simulated robot simultaneously or independently on b»controlled box.
 - Integration with MoveIt 2 for motion planning and trajectory execution
+
+** Developer Notes **
+
+- This workspace is setup for single or double arm control. We use prefix to specify all joints, joint limits, srdf, controller names and so on.
+  - single arm: `kassow` prefix is used.
+  - dual arm: `kassow_left` for sim and `kassow_right` for robot prefixes are used.
 
 ## Workspace setup
 
@@ -63,6 +65,21 @@ After building, source the workspace:
 
 ```bash
 source install/setup.bash
+```
+
+### 4. Edit your IP addresses
+
+Recoommended IP addresses and ports:
+
+- Robot: 10.23.23.204:28283
+- Sim: 10.23.23.205:28284
+
+```bash
+rosd kassow_kord_bringup && cd ./launch/kassow_kord_dual_arm_description.launch.xml
+```
+
+```bash
+rosd kassow_kord_bringup && cd ./launch/kassow_kord_description.launch.xml
 ```
 
 Now your development container should be ready for use.
@@ -122,8 +139,6 @@ multi arm: kassow_left, kassow_right.
 
 
 
-
-
 ### pc + kassow sim/robot
 
 1. sim: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false`
@@ -139,7 +154,5 @@ multi arm: kassow_left, kassow_right.
 
 - install rtw
 - load app
-- sim ip: 10.28.28.11
-- robot ip: 10.23.23.204
 - port thing
 - add scenario controllers to config
