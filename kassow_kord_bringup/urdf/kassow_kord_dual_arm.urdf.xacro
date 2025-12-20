@@ -5,19 +5,19 @@
 
   <xacro:arg name="robot_1_prefix" default="kassow_right"/>
   <xacro:arg name="robot_1_ip" default="10.23.23.204"/>
-  <xacro:arg name="robot_1_port" default="7582"/>
+  <xacro:arg name="robot_1_port" default="28283"/>
   <xacro:arg name="robot_1_session_id" default="1"/>
-  
+
   <xacro:arg name="robot_2_prefix" default="kassow_left"/>
-  <xacro:arg name="robot_2_ip" default="10.28.28.11"/>
-  <xacro:arg name="robot_2_port" default="7582"/>
+  <xacro:arg name="robot_2_ip" default="10.23.23.205"/>
+  <xacro:arg name="robot_2_port" default="28284"/>
   <xacro:arg name="robot_2_session_id" default="1"/>
-  
+
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/materials.xacro" />
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/inertials.xacro" />
   <xacro:include filename="$(find kassow_kord_description)/kr810/urdf/kr810_description.urdf.xacro"/>
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/kassow_kord.ros2_control.xacro"/>
-  
+
   <link name="world"/>
 
   <!-- KASSOW 1 -->

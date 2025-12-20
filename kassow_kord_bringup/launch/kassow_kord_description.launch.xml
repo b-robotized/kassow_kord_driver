@@ -24,8 +24,8 @@
   <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
   <arg name="prefix" default="kassow" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
   <arg name="use_mock_hardware" default="true" description="Whether to use mock hardware or real hardware."/>
-  <arg name="ip_address" default="10.28.28.11" description="IP address of the robot."/>
-  <arg name="port" default="7582" description="Port of the robot."/>
+  <arg name="ip_address" default="10.23.23.205" description="IP address of the robot."/>
+  <arg name="port" default="28284" description="Port of the robot."/>
   <arg name="session_id" default="1" description="Session ID of the robot."/>
 
   <let name="robot_description" value="$(command '$(find-exec xacro) $(find-pkg-share $(var description_package))/urdf/$(var description_file).urdf.xacro \
