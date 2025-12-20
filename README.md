@@ -21,6 +21,10 @@ This package provides a complete software solution for controlling Kassow Kord R
   - single arm: `kassow` prefix is used.
   - dual arm: `kassow_left` for sim and `kassow_right` for robot prefixes are used.
 
+## Robot Setup
+
+- port thing TODO
+
 ## Workspace setup
 
 ### 1. Clone all repositories from the `.repos` file
@@ -95,12 +99,12 @@ Now your development container should be ready for use.
 
    a. Run on kassow simulation
       ```
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
       ```
 
    b. Run on kassow robot
       ```
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
       ```
       *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
 
@@ -125,24 +129,53 @@ Now your development container should be ready for use.
 
 6. To stop the drivers of the robot that are running on b»controlled box use the following command:
    ```
-   ./dectivate_pssbl_robot.bash  # follow the output on the activity topic
+   ./deactivate_kassow_robot.bash  # follow the output on the activity topic
    ```
 
 ## Running both robot and simulation simultaneously
 
-### Setup
-
-single arm: kassow
-multi arm: kassow_left, kassow_right.
-
 ### MockHw
 
+```bash
+ros2 launch kassow_kord_bringup kassow_kord_dual_arm_bringup_mock.launch.xml
+```
 
+### CtrlX
 
-### pc + kassow sim/robot
+1. Echo in a terminal the output of the `activity` topic from b»controlled box to observe its internal state.
+   ```
+   ros2 topic echo /b_controlled_box_cm/activity
+   ```
 
-1. sim: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false`
-   robot: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204`
+2. To start the robot driver on the b»controlled box, choose one of the following:
+  ```bash
+  ros2 launch kassow_kord_bringup kassow_kord_dual_arm_description.launch.xml
+  ```
+  *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
+  *Now you should see output on the `activity` with `unconfigured` hardware interfaces.*
+
+3. In a new terminal, load the controllers, activate the hardware and enable control. Execute the commands form the `scripts` folder.
+   ```
+   rosd kassow_kord_bringup && cd scripts  # enter the correct folder
+   ./activate_hardware.sh  # follow the output on the activity topic
+   ./activate_controllers.sh  # follow the output on the activity topic
+   ```
+
+4. Start path planner (MoveIt2) and visualization (RViz 2):
+   ```
+   ros2 launch kassow_kord_bringup kassow_kord_dual_arm_moveit.launch.xml
+   ```
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+
+5. Now you can move the robot around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
+  ```
+  ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller
+  ```
+
+6. To stop the drivers of the robot that are running on b»controlled box use the following command:
+   ```
+   ./deactivate_dual_arm.bash  # follow the output on the activity topic
+   ```
 
 ## Resources
 
@@ -154,5 +187,3 @@ multi arm: kassow_left, kassow_right.
 
 - install rtw
 - load app
-- port thing
-- add scenario controllers to config
