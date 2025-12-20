@@ -1,63 +1,189 @@
 # kassow kord driver
 
-ros2 control hardware interface for kassow kord robot.
+This repository contains the configuration and setup for Kassow Kord control, which demonstrates the use of a b»controlled box for robotic tasks.
 
-![Licence](https://img.shields.io/badge/License-Apache-2.0-blue.svg)
+> [!WARNING]
+> This repository is under heavy development. If some links break or if some instruction do not lead to a smooth experience, please contact the developers.
 
-Pluginlib-Library: kassow_kord_hardware_interface
-Plugin: kassow_kord_hardware_interface/KassowKordHardwareInterface (hardware_interface::SystemInterface)
+## Overview
 
-## How to use
+This package provides a complete software solution for controlling Kassow Kord Robot (KR810) with full hardware integration and motion planning capabilities. The package implements a custom hardware interface compatible with ros2_control, enabling seamless operation of both physical robot and simulated one.
 
-### mock hw
+** Primary Capabilities:**
 
-`ros2 launch kassow_kord_bringup kassow_kord_offline.launch.xml`
+- Control of Kassow KR810 collaborative robots through a custom hardware interface and Joint Trajectory Controller
+- Multi-robot setup to control both real and simulated robot simultaneously or independently on b»controlled box.
+- Integration with MoveIt 2 for motion planning and trajectory execution
 
-### pc + kassow sim/robot
+** Developer Notes **
 
-1. sim: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false`
-   robot: `ros2 launch kassow_kord_bringup kassow_kord_bringup.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204`
+- This workspace is setup for single or double arm control. We use prefix to specify all joints, joint limits, srdf, controller names and so on.
+  - single arm: `kassow` prefix is used.
+  - dual arm: `kassow_left` for sim and `kassow_right` for robot prefixes are used.
 
-2. To move, you have to options:
-    a. move with rqt: `ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller`
-    b. move with cli: make sure to update joint limits to be close to current
-    ```bash
-    ros2 action send_goal /joint_trajectory_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory "
-    trajectory:
-      joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6, joint_7]
-      points:
-        - positions: [1.609778, 0.067324, 1.497803, 0.010716, -1.595989, 1.50, 2.09592]
-          velocities: []
-          time_from_start:
-            sec: 3
-            nanosec: 0
-    "
-    ```
+## Robot Setup
 
-### ctrlX + kassow sim/robot
+- port thing TODO
 
-1. sim: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false`
-   robot: `ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204`
-2. put on operating mode
-3. activate hardware: `ros2 control set_hardware_component_state -c /b_controlled_box_cm kassow_kord_control active`
-4. spawn joint state broadcaster: `ros2 run controller_manager spawner -c /b_controlled_box_cm -p ./src/kassow_kord_driver/kassow_kord_bringup/config/kassow_kord_controllers.yaml joint_state_broadcaster`
-5. spawn joint trajectory controller: `ros2 run controller_manager spawner -c /b_controlled_box_cm -p ./src/kassow_kord_driver/kassow_kord_bringup/config/kassow_kord_controllers.yaml joint_trajectory_controller`
-6. move: make sure to update joint limits to be close to current
-    ```
-    ros2 action send_goal /joint_trajectory_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory "
-    trajectory:
-      joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6, joint_7]
-      points:
-        - positions: [1.609778, 0.067324, 1.497803, 0.010716, -1.595989, 1.50, 2.09592]
-          velocities: []
-          time_from_start:
-            sec: 3
-            nanosec: 0
-    "
-    ```
+## Workspace setup
+
+### 1. Clone all repositories from the `.repos` file
+
+Make sure you have `python3-vcstool` installed:
+
+```bash
+sudo apt update
+```
+
+From the root of your workspace (e.g., `/kassow_kord_ws` -> easily direct to ws folder with the command `rosd`), run:
+
+```bash
+vcs import src < kassow_kord_driver.jazzy.repos
+```
+
+This will clone all repositories listed in the `kassow_kord_driver.jazzy.repos` file into the `src` directory.
+
+### 2. Install ROS 2 dependencies with `rosdepi`
+
+Update rosdep
+
+```bash
+rosdep update
+```
+
+Install dependencies
+
+```bash
+rosdepi
+```
+
+### 3. Build the workspace
+
+Use `rtw` to build the workspace:
+
+```bash
+cb
+```
+
+After building, source the workspace:
+
+```bash
+source install/setup.bash
+```
+
+### 4. Edit your IP addresses
+
+Recoommended IP addresses and ports:
+
+- Robot: 10.23.23.204:28283
+- Sim: 10.23.23.205:28284
+
+```bash
+rosd kassow_kord_bringup && cd ./launch/kassow_kord_dual_arm_description.launch.xml
+```
+
+```bash
+rosd kassow_kord_bringup && cd ./launch/kassow_kord_description.launch.xml
+```
+
+Now your development container should be ready for use.
+
+## Running robot or simulation independently on ctrlX
+
+1. Echo in a terminal the output of the `activity` topic from b»controlled box to observe its internal state.
+   ```
+   ros2 topic echo /b_controlled_box_cm/activity
+   ```
+
+2. To start the robot driver on the b»controlled box, choose one of the following:
+
+   a. Run on kassow simulation
+      ```
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
+      ```
+
+   b. Run on kassow robot
+      ```
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
+      ```
+      *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
+
+    *Now you should see output on the `activity` with `unconfigured` hardware interfaces.*
+
+3. In a new terminal, load the controllers, activate the hardware and enable control. Execute the commands form the `scripts` folder.
+   ```
+   rosd kassow_kord_bringup && cd scripts  # enter the correct folder
+   ./activate_kassow_robot.bash  # follow the output on the activity topic
+   ```
+
+4. Start path planner (MoveIt2) and visualization (RViz 2):
+   ```
+   ros2 launch kassow_kord_bringup kassow_kord_moveit.launch.xml
+   ```
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+
+5. Now you can move the robot around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
+  ```
+  ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller
+  ```
+
+6. To stop the drivers of the robot that are running on b»controlled box use the following command:
+   ```
+   ./deactivate_kassow_robot.bash  # follow the output on the activity topic
+   ```
+
+## Running both robot and simulation simultaneously
+
+### MockHw
+
+```bash
+ros2 launch kassow_kord_bringup kassow_kord_dual_arm_bringup_mock.launch.xml
+```
+
+### CtrlX
+
+1. Echo in a terminal the output of the `activity` topic from b»controlled box to observe its internal state.
+   ```
+   ros2 topic echo /b_controlled_box_cm/activity
+   ```
+
+2. To start the robot driver on the b»controlled box, choose one of the following:
+  ```bash
+  ros2 launch kassow_kord_bringup kassow_kord_dual_arm_description.launch.xml
+  ```
+  *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
+  *Now you should see output on the `activity` with `unconfigured` hardware interfaces.*
+
+3. In a new terminal, load the controllers, activate the hardware and enable control. Execute the commands form the `scripts` folder.
+   ```
+   rosd kassow_kord_bringup && cd scripts  # enter the correct folder
+   ./activate_hardware.sh  # follow the output on the activity topic
+   ./activate_controllers.sh  # follow the output on the activity topic
+   ```
+
+4. Start path planner (MoveIt2) and visualization (RViz 2):
+   ```
+   ros2 launch kassow_kord_bringup kassow_kord_dual_arm_moveit.launch.xml
+   ```
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+
+5. Now you can move the robot around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
+  ```
+  ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller
+  ```
+
+6. To stop the drivers of the robot that are running on b»controlled box use the following command:
+   ```
+   ./deactivate_dual_arm.bash  # follow the output on the activity topic
+   ```
 
 ## Resources
 
 - https://www.kassowrobots.com/downloads/product-manuals
 - https://kassowrobots.gitlab.io/kord-api-doc/index.html
 - https://gitlab.com/kassowrobots/kord-api
+
+# Notes:
+
+- install rtw
+- load app
