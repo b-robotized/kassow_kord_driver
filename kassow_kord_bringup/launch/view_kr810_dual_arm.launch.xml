@@ -20,12 +20,12 @@
 
 <launch>
   <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
-  <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
+  <arg name="description_file" default="kassow_kord_dual_arm" description="URDF/XACRO description file with the robot."/>
 
-  <include file="$(find-pkg-share $(var description_package))/launch/kassow_kord_description.launch.xml"/>
+  <include file="$(find-pkg-share $(var description_package))/launch/kassow_kord_description_dual_arm.launch.xml"/>
 
   <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" name="joint_state_publisher_node"/>
 
-  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var description_package))/config/kassow_kord.rviz --ros-args --log-level fatal"/>
+  <node pkg="rviz2" exec="rviz2" name="rviz2" output="log" args="-d $(find-pkg-share $(var description_package))/config/kassow_kord_dual_arm.rviz --ros-args --log-level fatal"/>
 
 </launch>

@@ -22,7 +22,7 @@
 
   <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
   <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
-  <arg name="prefix" default="" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
+  <arg name="prefix" default="kassow" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
   <arg name="use_mock_hardware" default="true" description="Whether to use mock hardware or real hardware."/>
   <arg name="ip_address" default="10.28.28.11" description="IP address of the robot."/>
   <arg name="port" default="7582" description="Port of the robot."/>

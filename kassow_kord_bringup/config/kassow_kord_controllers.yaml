@@ -20,13 +20,18 @@
 b_controlled_box_cm:
   ros__parameters:
     update_rate: 250  # Hz
-    hardware_components_initial_state:
-      unconfigured: ["kassow_kord_control"]
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
     joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    kassow_joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    kassow_left_joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    kassow_right_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
 joint_trajectory_controller:
@@ -40,6 +45,100 @@ joint_trajectory_controller:
       - joint_5
       - joint_6
       - joint_7
+
+    command_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_publish_rate: 50.0 # Defaults to 50
+    action_monitor_rate: 20.0 # Defaults to 20
+
+    allow_partial_joints_goal: false # Defaults to false
+    constraints:
+      stopped_velocity_tolerance: 0.01 # Defaults to 0.01
+      goal_time: 0.0 # Defaults to 0.0 (start immediately)
+
+kassow_joint_trajectory_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    update_rate: 250  # Hz
+    joints:
+      - kassow_joint_1
+      - kassow_joint_2
+      - kassow_joint_3
+      - kassow_joint_4
+      - kassow_joint_5
+      - kassow_joint_6
+      - kassow_joint_7
+
+    command_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_publish_rate: 50.0 # Defaults to 50
+    action_monitor_rate: 20.0 # Defaults to 20
+
+    allow_partial_joints_goal: false # Defaults to false
+    constraints:
+      stopped_velocity_tolerance: 0.01 # Defaults to 0.01
+      goal_time: 0.0 # Defaults to 0.0 (start immediately)
+
+
+kassow_left_joint_trajectory_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    update_rate: 250  # Hz
+    joints:
+      - kassow_left_joint_1
+      - kassow_left_joint_2
+      - kassow_left_joint_3
+      - kassow_left_joint_4
+      - kassow_left_joint_5
+      - kassow_left_joint_6
+      - kassow_left_joint_7
+
+    command_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_interfaces:
+      - position
+      - velocity
+      - acceleration
+
+    state_publish_rate: 50.0 # Defaults to 50
+    action_monitor_rate: 20.0 # Defaults to 20
+
+    allow_partial_joints_goal: false # Defaults to false
+    constraints:
+      stopped_velocity_tolerance: 0.01 # Defaults to 0.01
+      goal_time: 0.0 # Defaults to 0.0 (start immediately)
+
+kassow_right_joint_trajectory_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    update_rate: 250  # Hz
+    joints:
+      - kassow_right_joint_1
+      - kassow_right_joint_2
+      - kassow_right_joint_3
+      - kassow_right_joint_4
+      - kassow_right_joint_5
+      - kassow_right_joint_6
+      - kassow_right_joint_7
 
     command_interfaces:
       - position

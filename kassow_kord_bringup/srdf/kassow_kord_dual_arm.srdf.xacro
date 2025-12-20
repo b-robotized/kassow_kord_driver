@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<robot name="kassow_kord" xmlns:xacro="http://wiki.ros.org/xacro">
+    <xacro:arg name="robot_1_prefix" default="left"/>
+    <xacro:arg name="robot_2_prefix" default="right"/>
+
+    <xacro:include filename="$(find kassow_kord_bringup)/srdf/kassow_kord_macro.srdf.xacro"/>
+
+    <xacro:kassow_kord_srdf prefix="$(arg robot_1_prefix)"/>
+    <xacro:kassow_kord_srdf prefix="$(arg robot_2_prefix)"/>
+
+</robot>
