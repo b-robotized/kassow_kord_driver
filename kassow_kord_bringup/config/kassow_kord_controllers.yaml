@@ -1,4 +1,4 @@
-# Copyright (c) 20224 Stogl Robotics Consulting UG (haftungsbeschränkt)
+# Copyright (c) 20225 b»robotized Group
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# Source of this file are templates in
-# [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
-#
-
 b_controlled_box_cm:
   ros__parameters:
     update_rate: 250  # Hz
@@ -24,45 +19,18 @@ b_controlled_box_cm:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-    joint_trajectory_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
     kassow_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+
     kassow_left_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
     kassow_right_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-joint_trajectory_controller:
+joint_state_broadcaster:
   ros__parameters:
-    update_rate: 250  # Hz
-    joints:
-      - joint_1
-      - joint_2
-      - joint_3
-      - joint_4
-      - joint_5
-      - joint_6
-      - joint_7
+    type: joint_state_broadcaster/JointStateBroadcaster
 
-    command_interfaces:
-      - position
-      - velocity
-      - acceleration
-
-    state_interfaces:
-      - position
-      - velocity
-      - acceleration
-
-    state_publish_rate: 50.0 # Defaults to 50
-    action_monitor_rate: 20.0 # Defaults to 20
-
-    allow_partial_joints_goal: false # Defaults to false
-    constraints:
-      stopped_velocity_tolerance: 0.01 # Defaults to 0.01
-      goal_time: 0.0 # Defaults to 0.0 (start immediately)
 
 kassow_joint_trajectory_controller:
   ros__parameters:

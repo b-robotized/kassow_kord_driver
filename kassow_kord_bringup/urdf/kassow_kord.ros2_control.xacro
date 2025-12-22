@@ -5,8 +5,8 @@
               params="name
                       prefix
                       use_mock_hardware:=true
-                      ip_address:=10.23.23.205
-                      port:=28284
+                      ip_address:=10.23.23.238
+                      port:=28283
                       session_id:=1
                       waitSync_timeout_ms:=8"
                       >
