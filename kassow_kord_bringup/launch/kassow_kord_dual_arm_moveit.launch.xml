@@ -68,7 +68,7 @@
 
   <let name="robot_description_semantic_content"
        value="$(command '$(find-exec xacro) $(var semantic_description_file_path) \
-        robot_1_prefix:=kassow_left \ 
+        robot_1_prefix:=kassow_left \
         robot_2_prefix:=kassow_right')"/>
 
   <node pkg="moveit_ros_move_group" exec="move_group" output="screen">

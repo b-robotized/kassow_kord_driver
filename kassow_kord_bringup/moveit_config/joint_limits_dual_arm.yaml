@@ -67,7 +67,7 @@
           has_acceleration_limits: true
           max_acceleration: 7.0
 
-        
+
         #--------- KASSOW DUAL JOINT LIMITS - RIGHT
         kassow_right_joint_1:
           has_position_limits: true
