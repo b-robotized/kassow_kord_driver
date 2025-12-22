@@ -55,19 +55,19 @@ Please first refer to kassow manual for installation steps. This guide covers th
 ### 1. Press the 3 dot icon > CBun
 
 <p align="center">
-<img src="./assets/kassow_1.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_1.jpg" alt="Description of image" width="60%">
 </p>
 
 ### 2. Choose CBuns tab > press +
 
 <p align="center">
-<img src="./assets/kassow_2.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_2.jpg" alt="Description of image" width="60%">
 </p>
 
 ### 3. Enter the port for the CBun then activate
 
 <p align="center">
-<img src="./assets/kassow_3.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_3.jpg" alt="Description of image" width="60%">
 </p>
 
 ## Workspace setup
@@ -137,7 +137,25 @@ Please first refer to kassow manual for installation steps. This guide covers th
 
 Now your development container should be ready for use.
 
-## Running robot or simulation independently on ctrlX
+## Running robot or simulation independently
+
+### mockHw
+
+- First terminal:
+
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_bringup_mock.launch.xml start_rviz:=false
+
+   ```
+
+- Second terminal:
+
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_moveit.launch.xml
+
+   ```
+
+### CtrlX
 
 1. Echo in a terminal the output of the `activity` topic from b»controlled box to observe its internal state.
    ```bash
@@ -187,9 +205,19 @@ Now your development container should be ready for use.
 
 ### MockHw
 
-```bash
-ros2 launch kassow_kord_bringup kassow_kord_dual_arm_bringup_mock.launch.xml
-```
+- First terminal:
+
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_dual_arm_bringup_mock.launch.xml start_rviz:=false
+
+   ```
+
+- Second terminal:
+
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_dual_arm_moveit.launch.xml
+
+   ```
 
 ### CtrlX
 

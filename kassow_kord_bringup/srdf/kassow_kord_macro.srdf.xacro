@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<robot xmlns:xacro="http://wiki.ros.org/xacro">
+<robot name="kassow_kord" xmlns:xacro="http://wiki.ros.org/xacro">
 
   <xacro:macro name="kassow_kord_srdf" params="prefix">
 
