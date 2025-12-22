@@ -7,7 +7,7 @@ This repository contains the configuration and setup for Kassow Kord control, wh
 
 ## Overview
 
-This package provides a complete software solution for controlling Kassow Kord Robot (KR810) with full hardware integration and motion planning capabilities. The package implements a custom hardware interface compatible with ros2_control, enabling seamless operation of both physical robot and simulated one.
+This package provides a software solution for controlling Kassow Kord Robot (KR810) using KORD interface. It integrates with ros2_control and provides motion planning capabilities.
 
 **Primary Capabilities:**
 
@@ -235,27 +235,18 @@ ros2 launch kassow_kord_bringup kassow_kord_dual_arm_bringup_mock.launch.xml
 - https://kassowrobots.gitlab.io/kord-api-doc/index.html
 - https://gitlab.com/kassowrobots/kord-api
 
+## Known issues
+
+1. No effort states when connecting to the simulated Kassow Controller.
+
 ## Troubleshooting
 
-- Reported bug: No effort states in simulation.
-- Connection issues: make sure to ping the ip of the robot/sim from ctrlX:
-   ```bash
-   Settings > Network Diagnostics
-   ```
-- When all else fails, restart CBUN
-- Make sure you are not running multiple kord interfaces
-- *b»controlled box crashed for any reason:* lead the CtrlX back to SERVICE mode. This resets the controller manager instance, and should transition back to "`Waiting for robot description`", as inspected in the `Logbook` on the CtrlX.
+#### Connection issues when trying to set the robot to `inactive` state.
+Make sure that the IP addresses are set correctly and you can ping the robot.
 
-   - If for any reason the restart fails and the app does not wait for robot description, restart the CtrlX device.
+#### No connection to robot interface even everything above is correct
+Stop, remove, re-add, and activate the CBun by **making sure the parameters are correct**.
+We have observed that after CBun was already activated and port is changed, the new port was not applied even after re-activation.
 
-- *I changed the IP address of the CtrlX device, now I don't see ROS topics anymore on my commissioning PC/container:* Restart the CtrlX device.
-
-- *I can ping the CtrlX from my workspace and back, but I see no ROS topics.*
-    - ensure your container is at IP address `192.168.28.202` or `192.168.28.201`. These are the IPs the ROS network from CtrlX sees.
-    - ensure you've exported `ROS_STATIC_PEERS="192.168.28.28` in you workspace terminal, to ensure the ROS network from your workspace sees the IP of the CtrlX
-    - restart the daemon
-    ```
-    ros2 daemon stop
-    ros2 daemon start
-    ros2 topic list
-    ```
+#### Connection is working, but the robot doesn't move
+Make sure that only one KORD interface is loaded and active.
