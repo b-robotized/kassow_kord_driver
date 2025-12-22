@@ -1,0 +1,24 @@
+name: Jazzy Build
+# author: Christoph Froehlich <christoph.froehlich@ait.ac.at>
+# description: 'Build all dependencies from released (binary) packages.'
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+  schedule:
+    # Run every morning to detect flakiness and broken dependencies
+    - cron: '03 1 * * *'
+
+jobs:
+  stack-build:
+    uses: ./.github/workflows/reusable-industrial-ci-with-cache.yml
+    strategy:
+      fail-fast: false
+    with:
+      ros_distro: jazzy
+      ros_repo: main
+      target_workspace: kassow_kord_driver.jazzy.repos
+      ref_for_scheduled_build: master
