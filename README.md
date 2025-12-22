@@ -55,19 +55,19 @@ Please first refer to kassow manual for installation steps. This guide covers th
 ### 1. Press the 3 dot icon > CBun
 
 <p align="center">
-<img src="./assets/kassow_1.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_1.jpg" alt="Description of image" width="60%">
 </p>
 
 ### 2. Choose CBuns tab > press +
 
 <p align="center">
-<img src="./assets/kassow_2.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_2.jpg" alt="Description of image" width="60%">
 </p>
 
 ### 3. Enter the port for the CBun then activate
 
 <p align="center">
-<img src="./assets/kassow_3.jpg" alt="Description of image" width="60%">
+<img src="./kassow_kord_hardware_interface/doc/assets/kassow_3.jpg" alt="Description of image" width="60%">
 </p>
 
 ## Workspace setup
