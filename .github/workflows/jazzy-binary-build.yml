@@ -23,3 +23,4 @@ jobs:
       target_workspace: kassow_kord_driver.jazzy.repos
       ref_for_scheduled_build: master
       not_test_build: true
+      not_test_downstream: true
