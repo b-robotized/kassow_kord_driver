@@ -22,3 +22,4 @@ jobs:
       ros_repo: main
       target_workspace: kassow_kord_driver.jazzy.repos
       ref_for_scheduled_build: master
+      not_test_build: true
