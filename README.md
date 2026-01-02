@@ -155,6 +155,46 @@ Now your development container should be ready for use.
 
    ```
 
+### Locally on PC
+
+
+1. Send robot description:
+
+   a. Run on kassow simulation
+      ```bash
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
+      ```
+
+   b. Run on kassow robot
+      ```bash
+      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
+      ```
+
+2. Launch the controller manager:
+
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_cm.launch.xml
+   ```
+
+3. Echo the output of the `activity` topic:
+
+   ```bash
+   ros2 topic echo /b_controlled_box_cm/activity
+   ```
+
+4. Activate controllers:
+
+   ```bash
+   ros2 run controller_manager spawner -c /b_controlled_box_cm joint_state_broadcaster               # observe activity
+   ros2 run controller_manager spawner -c /b_controlled_box_cm kassow_joint_trajectory_controller    # observe activity
+   ```
+
+5. Start path planner (MoveIt2) and visualization (RViz 2):
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_moveit.launch.xml
+   ```
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+
 ### CtrlX
 
 1. Echo in a terminal the output of the `activity` topic from b»controlled box to observe its internal state.
