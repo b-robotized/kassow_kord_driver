@@ -12,14 +12,15 @@ This package provides a software solution for controlling Kassow Kord Robot (KR8
 **Primary Capabilities:**
 
 - Control of Kassow KR810 collaborative robots through a custom hardware interface and Joint Trajectory Controller
-- Multi-robot setup to control both real and simulated robot simultaneously or independently on b»controlled box.
+- Single-robot and multi-robot setup capabilities to control robots simultaneously or independently on b»controlled box
 - Integration with MoveIt 2 for motion planning and trajectory execution
 
 **Developer Notes**
 
-- This workspace is setup for single or double arm control. We use prefix to specify all joints, joint limits, srdf, controller names and so on. Better not touch the prefixes, but if you do prepare to update moveit configs and controllers.yaml
-  - single arm: `kassow` prefix is used.
-  - dual arm: `kassow_left` for sim and `kassow_right` for robot prefixes are used.
+- This workspace is setup for single or multi-robot control. We use prefixes to specify all joints, joint limits, srdf, controller names and so on. Better not touch the prefixes, but if you do prepare to update moveit configs and controllers.yaml
+  - single robot: `kassow` prefix is used.
+  - multi-robot: individual prefixes are used (e.g., `kassow_left` and `kassow_right` in the dual-arm example)
+- This repository demonstrates multi-robot capabilities by controlling a real Kassow robot and a simulated Kassow robot simultaneously. However, the architecture supports any combination of multiple robots - the real+simulation setup is just one example implementation.
 
 **Package Structure**
 
@@ -137,7 +138,9 @@ Please first refer to kassow manual for installation steps. This guide covers th
 
 Now your development container should be ready for use.
 
-## Running robot or simulation independently
+## Single Robot Setup
+
+This section covers how to run a single robot instance.
 
 ### mockHw
 
@@ -157,18 +160,21 @@ Now your development container should be ready for use.
 
 ### Locally on PC
 
+1. Send robot description with your configured IP and port:
 
-1. Send robot description:
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=<YOUR_IP> port:=<YOUR_PORT>
+   ```
 
-   a. Run on kassow simulation
-      ```bash
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
-      ```
+   **Example using real robot:**
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
+   ```
 
-   b. Run on kassow robot
-      ```bash
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
-      ```
+   **Example using simulation:**
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
+   ```
 
 2. Launch the controller manager:
 
@@ -193,7 +199,7 @@ Now your development container should be ready for use.
    ```bash
    ros2 launch kassow_kord_bringup kassow_kord_moveit.launch.xml
    ```
-   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activated.*
 
 ### CtrlX
 
@@ -202,20 +208,25 @@ Now your development container should be ready for use.
    ros2 topic echo /b_controlled_box_cm/activity
    ```
 
-2. To start the robot driver on the b»controlled box, choose one of the following:
+2. Start the robot driver on the b»controlled box with your configured IP and port:
 
-   a. Run on kassow simulation
-      ```bash
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
-      ```
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=<YOUR_IP> port:=<YOUR_PORT>
+   ```
 
-   b. Run on kassow robot
-      ```bash
-      ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
-      ```
-      *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
+   **Example using real robot:**
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.204 port:=28283
+   ```
 
-    *Now you should see output on the `activity` with `unconfigured` hardware interfaces.*
+   **Example using simulation:**
+   ```bash
+   ros2 launch kassow_kord_bringup kassow_kord_description.launch.xml use_mock_hardware:=false ip_address:=10.23.23.205 port:=28284
+   ```
+
+   *Note: ensure MotionApp is in state `RUNNING` before activating hardware.*
+
+   *Now you should see output on the `activity` with `unconfigured` hardware interfaces.*
 
 3. In a new terminal, load the controllers, activate the hardware and enable control. Execute the commands form the `scripts` folder.
    ```bash
@@ -228,7 +239,7 @@ Now your development container should be ready for use.
    ```bash
    ros2 launch kassow_kord_bringup kassow_kord_moveit.launch.xml
    ```
-   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activated.*
 
 5. Now you can move the robot around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
 
@@ -241,7 +252,11 @@ Now your development container should be ready for use.
    ./deactivate_kassow_robot.bash  # follow the output on the activity topic
    ```
 
-## Running both robot and simulation simultaneously
+## Multi-Robot Setup
+
+This section covers how to run multiple robot instances simultaneously.
+
+> **Note:** This repository demonstrates multi-robot control using one real Kassow robot and one simulated Kassow robot. This is just one example - the architecture supports any combination of multiple robot instances.
 
 ### MockHw
 
@@ -266,7 +281,7 @@ Now your development container should be ready for use.
    ros2 topic echo /b_controlled_box_cm/activity
    ```
 
-2. To start the robot driver on the b»controlled box, choose one of the following:
+2. Start the robot drivers on the b»controlled box. The dual arm launch file will use the IP addresses and ports configured in `kassow_kord_dual_arm_description.launch.xml`:
   ```bash
   ros2 launch kassow_kord_bringup kassow_kord_dual_arm_description.launch.xml
   ```
@@ -285,14 +300,14 @@ Now your development container should be ready for use.
    ```bash
    ros2 launch kassow_kord_bringup kassow_kord_dual_arm_moveit.launch.xml
    ```
-   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activeated.*
+   *MoveIt and visualisation can be started as soon as the hardware is active and Joint State Broadcaster is activated.*
 
-5. Now you can move the robot around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
+5. Now you can move the robots around either with moveit rviz plugin with motion planning, or you can directly use JTC CLI or rqt:
   ```bash
   ros2 run rqt_joint_trajectory_controller rqt_joint_trajectory_controller
   ```
 
-6. To stop the drivers of the robot that are running on b»controlled box use the following command:
+6. To stop the drivers of the robots that are running on b»controlled box use the following command:
    ```bash
    ./deactivate_dual_arm.bash  # follow the output on the activity topic
    ```
