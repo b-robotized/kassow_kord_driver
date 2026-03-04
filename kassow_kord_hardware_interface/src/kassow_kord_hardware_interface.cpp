@@ -214,6 +214,13 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
   // Reset robot errors and alarms as needed
   try
   {
@@ -248,14 +255,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
-
-  RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
-
-hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
-  const rclcpp_lifecycle::State & /*previous_state*/)
-{
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -279,6 +278,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   }
 
   rcv_iface_->fetchData();
+
+  if (rcv_iface_->systemAlarmState())
+  {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected, deactivating...");
+    return hardware_interface::return_type::ERROR;
+  }
+
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
@@ -318,6 +324,60 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
 // clean all alarms
 bool KassowKordHardwareInterface::clean_alarms()
 {
+  rcv_iface_->fetchData();
+
+  if (rcv_iface_->systemAlarmState())
+  {
+    unsigned int motion_flags = rcv_iface_->getMotionFlags();
+    unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
+
+    // If nothing to clear, early exit
+    if (motion_flags == 0 && safety_flags == 0)
+    {
+      RCLCPP_INFO(get_logger(), "No errors.");
+    }
+
+    RCLCPP_INFO(get_logger(), "Motion flags: %d", motion_flags);
+    RCLCPP_INFO(get_logger(), "Robot safety flags: %d", safety_flags);
+
+    if (safety_flags & SafetyFlags::SAFETY_FLAG_USER_CONF_REQ)
+    {
+      RCLCPP_ERROR(get_logger(), "Errors cannot be cleared. User confirmation required.");
+    }
+
+    const bool is_halt = motion_flags & MotionFlags::MOTION_FLAG_HALT;
+    const bool is_pstop = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
+
+    if (is_halt && is_pstop)
+    {
+      RCLCPP_ERROR(get_logger(), "Halt Error.");
+    }
+
+    if (motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED)
+    {
+      RCLCPP_ERROR(get_logger(), "Suspend Error.");
+    }
+
+    bool is_cbun = rcv_iface_->systemAlarmState() & kr2::kord::protocol::CAT_CBUN_EVENT;
+
+    // Check for KORD event
+    const auto system_events = rcv_iface_->getSystemEvents();
+    for (auto & event : system_events)
+    {
+      if (event.event_group_ == kr2::kord::protocol::eKordEvent)
+      {
+        is_cbun = true;
+        break;
+      }
+    }
+
+    if (is_cbun)
+    {
+      RCLCPP_ERROR(get_logger(), "CBun Error.");
+    }
+  }
+
+  // clear errors
   std::map<kr2::kord::ControlInterface::EClearRequest, std::string> commands_mapped = {
     {kr2::kord::ControlInterface::EClearRequest::CLEAR_HALT, "CLEAR_HALT"},
     {kr2::kord::ControlInterface::EClearRequest::CBUN_EVENT, "CBUN_EVENT"},

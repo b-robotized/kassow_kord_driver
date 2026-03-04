@@ -64,6 +64,33 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  enum MotionFlags : unsigned int
+  {
+    MOTION_FLAG_STANDBY = 1,
+    MOTION_FLAG_TRACKING = 2,
+    MOTION_FLAG_TERMINATED = 4,
+    MOTION_FLAG_HALT = 8,
+    MOTION_FLAG_SYNC = 16,
+    MOTION_FLAG_SUSPENDED = 32,
+    MOTION_FLAG_OFFLINE = 64,
+    MOTION_FLAG_INIT = 128,
+    MOTION_FLAG_REINIT = 256,
+    MOTION_FLAG_BACKDRIVE = 512,
+    MOTION_FLAG_PAUSED = 1024,
+    MOTION_FLAG_MAINTENANCE = 2048,
+    MOTION_FLAG_VELOCITYCTL = 4096,
+    MOTION_FLAG_ARTOACTIVE = 8192
+  };
+
+  enum SafetyFlags : unsigned int
+  {
+    SAFETY_FLAG_UPDATE = 1,
+    SAFETY_FLAG_ESTOP = 2,
+    SAFETY_FLAG_PSTOP = 4,
+    SAFETY_FLAG_SSTOP = 8,
+    SAFETY_FLAG_USER_CONF_REQ = 16
+  };
+
 private:
   bool clean_alarms();
 
