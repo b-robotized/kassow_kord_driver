@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <robot name="kassow_kord" xmlns:xacro="http://wiki.ros.org/xacro">
 
-  <xacro:macro name="kassow_kord_srdf" params="prefix">
+  <xacro:macro name="kassow_kord_srdf" params="prefix tip_link='end_effector'">
 
     <group name="${prefix}_manipulator">
-        <chain base_link="${prefix}_base" tip_link="${prefix}_end_effector"/>
+        <chain base_link="${prefix}_base" tip_link="${prefix}_${tip_link}"/>
     </group>
 
     <disable_collisions link1="${prefix}_base" link2="${prefix}_link1" reason="Adjacent" />
