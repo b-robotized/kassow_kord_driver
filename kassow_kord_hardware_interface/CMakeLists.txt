@@ -10,7 +10,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
 endif()
 
 set(THIS_PACKAGE_DEPS
-  assimp
   hardware_interface
   pluginlib
   rclcpp
@@ -34,16 +33,14 @@ target_include_directories(
   ${PROJECT_NAME}
   PUBLIC
   include
-  # ${KASSOW_VENDOR_INCLUDE_DIR}
 )
-ament_target_dependencies(
-  ${PROJECT_NAME}
-  ${THIS_PACKAGE_DEPS}
-)
-
-# Link your driver library
 target_link_libraries(${PROJECT_NAME}
-  kord-api::kord-api
+  PUBLIC
+    hardware_interface::hardware_interface
+    pluginlib::pluginlib
+    rclcpp::rclcpp
+    rclcpp_lifecycle::rclcpp_lifecycle
+    kord-api::kord-api
 )
 
 # prevent pluginlib from using boost
