@@ -172,6 +172,31 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
+  // TODO(habartakh): Search for lore exceptions/error scenarios
+  //  Populate the GPIO interfaces (only digital inputs currently)
+  size_t di_index;
+  for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
+  {
+    for (const auto & state_io : gpio.state_interfaces)
+    {
+      if (state_io.parameters.count("index"))
+      {
+        di_index = stoi(state_io.parameters.at("index"));
+        digital_inputs_itfs_[di_index] = state_io.name;
+        RCLCPP_INFO(
+          get_logger(), "Current gpio state interface for DI%lu is: %s", di_index,
+          state_io.name.c_str());
+      }
+      else
+      {
+        RCLCPP_ERROR(
+          get_logger(), "state_interface '%s' is missing required parameter 'index'",
+          state_io.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -297,6 +322,24 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
+  }
+
+  bool value = false;
+  double input_value = 0.0;
+
+  // Get the Digital Inputs
+  // TODO(habartakh): We already use a command to fetch the data, see if we can fetch all info
+  // TODO(habartakh): at once then parse it later to avoid making multiple requests
+  int64_t digital_input = rcv_iface_->getDigitalInput();
+
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    value = (digital_input >> i) & 0x1;
+    input_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding state interface with the appropriate value
+    set_state(digital_inputs_itfs_[i], input_value);
   }
 
   return hardware_interface::return_type::OK;
