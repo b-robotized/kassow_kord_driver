@@ -172,6 +172,60 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
+  // TODO(habartakh): Search for more exceptions/error scenarios
+  //  Populate the GPIO interfaces
+  size_t bit_index;
+  std::string io_type;
+  for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
+  {
+    for (const auto & state_io : gpio.state_interfaces)
+    {
+      if (state_io.parameters.count("bit_index"))
+      {
+        bit_index = stoi(state_io.parameters.at("bit_index"));
+
+        if (state_io.parameters.count("io_type"))
+        {
+          io_type = state_io.parameters.at("io_type");
+          if (io_type == "input")
+          {
+            digital_inputs_itfs_[bit_index] = state_io.name;
+            // RCLCPP_INFO(
+            //   get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
+            //   state_io.name.c_str());
+          }
+          else if (io_type == "output")
+          {
+            digital_outputs_itfs_[bit_index] = state_io.name;
+            // RCLCPP_INFO(
+            //   get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
+            //   state_io.name.c_str());
+          }
+          else
+          {
+            RCLCPP_ERROR(
+              get_logger(), "Unknown io_type for state_interface '%s'", state_io.name.c_str());
+            return hardware_interface::CallbackReturn::ERROR;
+          }
+        }
+        else
+        {
+          RCLCPP_ERROR(
+            get_logger(), "state_interface '%s' is missing required parameter 'io_type'",
+            state_io.name.c_str());
+          return hardware_interface::CallbackReturn::ERROR;
+        }
+      }
+      else
+      {
+        RCLCPP_ERROR(
+          get_logger(), "state_interface '%s' is missing required parameter 'bit_index'",
+          state_io.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -255,6 +309,20 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
+
+  // Read initial Outputs and set them as the initial command values
+  prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    bool value = (prev_io_cmd_sent >> i) & 0x1;
+    double output_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding interfaces with the corresponding value
+    set_state(digital_outputs_itfs_[i], output_value);
+    set_command(digital_outputs_itfs_[i], output_value);
+  }
+
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -297,6 +365,36 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
+  }
+
+  bool value = false;
+  double input_value = 0.0;
+  double output_value = 0.0;
+
+  // Get the Digital Inputs
+  // TODO(habartakh): We already use a command to fetch the data, see if we can fetch all info
+  // TODO(habartakh): at once then parse it later to avoid making multiple requests
+  int64_t digital_input = rcv_iface_->getDigitalInput();
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    value = (digital_input >> i) & 0x1;
+    input_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding state interface with the appropriate value
+    set_state(digital_inputs_itfs_[i], input_value);
+  }
+
+  // Get the digital Outputs
+  int64_t digital_output = rcv_iface_->getDigitalOutput();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    value = (digital_output >> i) & 0x1;
+    output_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding state interface with the appropriate value
+    set_state(digital_outputs_itfs_[i], output_value);
   }
 
   return hardware_interface::return_type::OK;

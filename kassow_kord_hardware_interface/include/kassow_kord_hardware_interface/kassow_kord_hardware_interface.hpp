@@ -37,6 +37,8 @@
 namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
+const size_t KORD_INPUT_COUNT = 16;
+const size_t KORD_OUTPUT_COUNT = 16;
 
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
 {
@@ -111,6 +113,14 @@ private:
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
   std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
+
+  std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
+  // std::array<double, KORD_INPUT_COUNT> digital_inputs_states{};
+
+  std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
+  // std::array<double, KORD_OUTPUT_COUNT> digital_outputs_states{};
+
+  int64_t prev_io_cmd_sent;  // Bitmask of the previous IO commands sent
 
   std::string ip_address;
   int session_id;
