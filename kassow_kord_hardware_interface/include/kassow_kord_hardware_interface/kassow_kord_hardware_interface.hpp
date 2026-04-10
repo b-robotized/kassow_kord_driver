@@ -120,6 +120,8 @@ private:
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
   // std::array<double, KORD_OUTPUT_COUNT> digital_outputs_states{};
 
+  int64_t prev_io_cmd_sent;  // Bitmask of the previous IO commands sent
+
   std::string ip_address;
   int session_id;
   int port;

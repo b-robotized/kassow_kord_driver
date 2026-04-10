@@ -172,7 +172,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
-  // TODO(habartakh): Search for lore exceptions/error scenarios
+  // TODO(habartakh): Search for more exceptions/error scenarios
   //  Populate the GPIO interfaces
   size_t bit_index;
   std::string io_type;
@@ -309,6 +309,20 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
+
+  // Read initial Outputs and set them as the initial command values
+  prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    bool value = (prev_io_cmd_sent >> i) & 0x1;
+    double output_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding interfaces with the corresponding value
+    set_state(digital_outputs_itfs_[i], output_value);
+    set_command(digital_outputs_itfs_[i], output_value);
+  }
+
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -361,7 +375,6 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   // TODO(habartakh): We already use a command to fetch the data, see if we can fetch all info
   // TODO(habartakh): at once then parse it later to avoid making multiple requests
   int64_t digital_input = rcv_iface_->getDigitalInput();
-
   for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
   {
     // Extract the specific bit at i position
@@ -374,7 +387,6 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   // Get the digital Outputs
   int64_t digital_output = rcv_iface_->getDigitalOutput();
-
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
     // Extract the specific bit at i position
