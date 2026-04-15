@@ -15,6 +15,7 @@
 
 #include <kord/api/kord.h>
 #include <kord/api/kord_control_interface.h>
+#include <kord/api/kord_io_request.h>
 #include <kord/api/kord_receive_interface.h>
 #include <kord/utils/utils.h>
 #include <kord/version.h>
