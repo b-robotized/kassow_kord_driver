@@ -403,6 +403,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  // Joint Commands
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -414,6 +415,40 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   {
     RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
     return hardware_interface::return_type::ERROR;
+  }
+
+  // IO commands
+
+  // Build the desired mask from the command interfaces
+  int64_t desired_mask = 0;
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (get_command(digital_outputs_itfs_[i]) > 0.5)
+    {
+      desired_mask |= (1LL << i);
+    }
+  }
+
+  // Only send a command if something actually changed
+  if (desired_mask != prev_io_cmd_sent)
+  {
+    int64_t changed = desired_mask ^ prev_io_cmd_sent;
+    int64_t enable_mask = desired_mask & changed;    // which changed bits to turn on
+    int64_t disable_mask = ~desired_mask & changed;  // which changed bits to turn off
+
+    kr2::kord::RequestIO io_request;
+    if (enable_mask)
+    {
+      io_request.asSetIODigitalOut().withEnabledPorts(enable_mask);
+      ctl_iface_->transmitRequest(io_request);
+      prev_io_cmd_sent |= enable_mask;  // mark only enabled bits as sent
+    }
+    else
+    {
+      io_request.asSetIODigitalOut().withDisabledPorts(disable_mask);
+      ctl_iface_->transmitRequest(io_request);
+      prev_io_cmd_sent &= ~disable_mask;  // mark only disabled bits as sent
+    }
   }
 
   return hardware_interface::return_type::OK;
