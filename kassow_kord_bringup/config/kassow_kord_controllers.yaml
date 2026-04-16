@@ -27,6 +27,9 @@ b_controlled_box_cm:
     kassow_right_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    kassow_gpio_controller:
+      type: gpio_controllers/GpioCommandController
+
 joint_state_broadcaster:
   ros__parameters:
     type: joint_state_broadcaster/JointStateBroadcaster
@@ -125,3 +128,64 @@ kassow_right_joint_trajectory_controller:
     constraints:
       stopped_velocity_tolerance: 0.01 # Defaults to 0.01
       goal_time: 0.0 # Defaults to 0.0 (start immediately)
+
+
+kassow_gpio_controller:
+  ros__parameters:
+    type: gpio_controllers/GpioCommandController
+    gpios:
+      - kassow_digital_IOs
+
+    command_interfaces:
+      kassow_digital_IOs:
+        - kassow_digital_relay_1
+        - kassow_digital_relay_2
+        - kassow_digital_relay_3
+        - kassow_digital_relay_4
+        - kassow_digital_output_1
+        - kassow_digital_output_2
+        - kassow_digital_output_3
+        - kassow_digital_output_4
+        - kassow_digital_output_5
+        - kassow_digital_output_6
+        - kassow_digital_output_7
+        - kassow_digital_output_8
+        - kassow_digital_tb_1
+        - kassow_digital_tb_2
+        - kassow_digital_tb_3
+        - kassow_digital_tb_4
+
+    state_interfaces:
+      kassow_digital_IOs:
+        - kassow_digital_relay_1
+        - kassow_digital_relay_2
+        - kassow_digital_relay_3
+        - kassow_digital_relay_4
+        - kassow_digital_output_1
+        - kassow_digital_output_2
+        - kassow_digital_output_3
+        - kassow_digital_output_4
+        - kassow_digital_output_5
+        - kassow_digital_output_6
+        - kassow_digital_output_7
+        - kassow_digital_output_8
+        - kassow_digital_tb_1
+        - kassow_digital_tb_2
+        - kassow_digital_tb_3
+        - kassow_digital_tb_4
+        - kassow_digital_input_1
+        - kassow_digital_input_2
+        - kassow_digital_input_3
+        - kassow_digital_input_4
+        - kassow_digital_input_5
+        - kassow_digital_input_6
+        - kassow_digital_input_7
+        - kassow_digital_input_8
+        - kassow_digital_input_9
+        - kassow_digital_input_10
+        - kassow_digital_input_11
+        - kassow_digital_input_12
+        - kassow_digital_input_13
+        - kassow_digital_input_14
+        - kassow_digital_input_15
+        - kassow_digital_input_16
