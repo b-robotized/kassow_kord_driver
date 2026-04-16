@@ -173,7 +173,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   }
 
   // TODO(habartakh): Search for more exceptions/error scenarios
-  //  Populate the GPIO interfaces
+  //  Populate the GPIO interfaces vectors
   size_t bit_index;
   std::string io_type;
   for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
@@ -322,6 +322,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_state(digital_outputs_itfs_[i], output_value);
     set_command(digital_outputs_itfs_[i], output_value);
   }
+  ongoing_request_processing = false;  // Initialize before sending requests
 
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
@@ -397,6 +398,45 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(digital_outputs_itfs_[i], output_value);
   }
 
+  // Check if the IO write request is being processed or not
+  auto latest_response = rcv_iface_->getLatestRequest();
+
+  // If the 1 second elapsed without confirming reception of the request
+  auto time_elapsed = std::chrono::steady_clock::now() - init_time;
+  if (time_elapsed > std::chrono::seconds(1))
+  {
+    RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
+    // return hardware_interface::return_type::ERROR; stop or not?
+  }
+
+  else  // Timeout not reached yet
+  {
+    // Check if the sent IO request is being evaluated
+    if (io_request.request_rid_ != latest_response.request_rid_)
+    {
+      RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
+    }
+
+    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
+    {
+      RCLCPP_INFO(
+        get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
+        latest_response.request_rid_);
+
+      ongoing_request_processing = false;
+    }
+
+    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
+    {
+      RCLCPP_ERROR(
+        get_logger(), "ERROR: Request with RID %ld, transfer failed.",
+        latest_response.request_rid_);
+      ongoing_request_processing = false;
+
+      // return hardware_interface::return_type::ERROR; return error or continue sending commands?
+    }
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -429,28 +469,48 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     }
   }
 
-  // Only send a command if something actually changed
-  if (desired_mask != prev_io_cmd_sent)
+  bool command_changed = desired_mask != prev_io_cmd_sent;
+
+  // Only send a command if something actually changed AND no request is currently being processed
+  if (command_changed && !ongoing_request_processing)
   {
-    int64_t changed = desired_mask ^ prev_io_cmd_sent;
+    ongoing_request_processing = true;
+
+    int64_t changed =
+      desired_mask ^ prev_io_cmd_sent;  // which bits changed from the previous command sent
     int64_t enable_mask = desired_mask & changed;    // which changed bits to turn on
     int64_t disable_mask = ~desired_mask & changed;  // which changed bits to turn off
 
-    kr2::kord::RequestIO io_request;
-    if (enable_mask)
+    // TODO(habartakh): How to package both enable & disable bits inside the same IO request
+    if (enable_mask)  // Set bits to 1
     {
-      io_request.asSetIODigitalOut().withEnabledPorts(enable_mask);
+      io_request.asSetIODigitalOut().withEnabledPorts(
+        enable_mask);  // Only send enable OR disable per request
       ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to enable ports corresponding to the following mask: %ld",
+        io_request.request_rid_, enable_mask);
+
       prev_io_cmd_sent |= enable_mask;  // mark only enabled bits as sent
     }
-    else
+    else  // Set bits to 0
     {
       io_request.asSetIODigitalOut().withDisabledPorts(disable_mask);
       ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to disable ports corresponding to the following mask: %ld",
+        io_request.request_rid_, disable_mask);
+
       prev_io_cmd_sent &= ~disable_mask;  // mark only disabled bits as sent
     }
-  }
 
+    pending_io_rid = io_request.request_rid_;      // track the request
+    init_time = std::chrono::steady_clock::now();  // Start the timer
+  }
   return hardware_interface::return_type::OK;
 }
 

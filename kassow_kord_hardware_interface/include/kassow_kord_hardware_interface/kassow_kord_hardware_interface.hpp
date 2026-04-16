@@ -121,7 +121,12 @@ private:
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
   // std::array<double, KORD_OUTPUT_COUNT> digital_outputs_states{};
 
-  int64_t prev_io_cmd_sent;  // Bitmask of the previous IO commands sent
+  int64_t prev_io_cmd_sent;         // Bitmask of the previous IO commands sent
+  kr2::kord::RequestIO io_request;  // Request to send output commands
+  int64_t pending_io_rid;           // Identifier of the latest write request sent
+  std::chrono::time_point<std::chrono::steady_clock>
+    init_time;  // Timer starting point to calculate timeout for outputs setup
+  bool ongoing_request_processing;
 
   std::string ip_address;
   int session_id;
