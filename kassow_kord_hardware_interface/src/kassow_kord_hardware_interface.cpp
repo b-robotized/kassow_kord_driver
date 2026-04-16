@@ -172,6 +172,60 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
+  // TODO(habartakh): Search for more exceptions/error scenarios
+  //  Populate the GPIO interfaces vectors
+  size_t bit_index;
+  std::string io_type;
+  for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
+  {
+    for (const auto & state_io : gpio.state_interfaces)
+    {
+      if (state_io.parameters.count("bit_index"))
+      {
+        bit_index = stoi(state_io.parameters.at("bit_index"));
+
+        if (state_io.parameters.count("io_type"))
+        {
+          io_type = state_io.parameters.at("io_type");
+          if (io_type == "input")
+          {
+            digital_inputs_itfs_[bit_index] = state_io.name;
+            // RCLCPP_INFO(
+            //   get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
+            //   state_io.name.c_str());
+          }
+          else if (io_type == "output")
+          {
+            digital_outputs_itfs_[bit_index] = state_io.name;
+            // RCLCPP_INFO(
+            //   get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
+            //   state_io.name.c_str());
+          }
+          else
+          {
+            RCLCPP_ERROR(
+              get_logger(), "Unknown io_type for state_interface '%s'", state_io.name.c_str());
+            return hardware_interface::CallbackReturn::ERROR;
+          }
+        }
+        else
+        {
+          RCLCPP_ERROR(
+            get_logger(), "state_interface '%s' is missing required parameter 'io_type'",
+            state_io.name.c_str());
+          return hardware_interface::CallbackReturn::ERROR;
+        }
+      }
+      else
+      {
+        RCLCPP_ERROR(
+          get_logger(), "state_interface '%s' is missing required parameter 'bit_index'",
+          state_io.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -255,6 +309,21 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
+
+  // Read initial Outputs and set them as the initial command values
+  prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    bool value = (prev_io_cmd_sent >> i) & 0x1;
+    double output_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding interfaces with the corresponding value
+    set_state(digital_outputs_itfs_[i], output_value);
+    set_command(digital_outputs_itfs_[i], output_value);
+  }
+  ongoing_request_processing = false;  // Initialize before sending requests
+
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -299,12 +368,82 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
+  bool value = false;
+  double input_value = 0.0;
+  double output_value = 0.0;
+
+  // Get the Digital Inputs
+  // TODO(habartakh): We already use a command to fetch the data, see if we can fetch all info
+  // TODO(habartakh): at once then parse it later to avoid making multiple requests
+  int64_t digital_input = rcv_iface_->getDigitalInput();
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    value = (digital_input >> i) & 0x1;
+    input_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding state interface with the appropriate value
+    set_state(digital_inputs_itfs_[i], input_value);
+  }
+
+  // Get the digital Outputs
+  int64_t digital_output = rcv_iface_->getDigitalOutput();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    // Extract the specific bit at i position
+    value = (digital_output >> i) & 0x1;
+    output_value = value ? 1.0 : 0.0;
+
+    // Set the corresponding state interface with the appropriate value
+    set_state(digital_outputs_itfs_[i], output_value);
+  }
+
+  // Check if the IO write request is being processed or not
+  auto latest_response = rcv_iface_->getLatestRequest();
+
+  // If the 1 second elapsed without confirming reception of the request
+  auto time_elapsed = std::chrono::steady_clock::now() - init_time;
+  if (time_elapsed > std::chrono::seconds(1))
+  {
+    RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
+    // return hardware_interface::return_type::ERROR; stop or not?
+  }
+
+  else  // Timeout not reached yet
+  {
+    // Check if the sent IO request is being evaluated
+    if (io_request.request_rid_ != latest_response.request_rid_)
+    {
+      RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
+    }
+
+    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
+    {
+      RCLCPP_INFO(
+        get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
+        latest_response.request_rid_);
+
+      ongoing_request_processing = false;
+    }
+
+    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
+    {
+      RCLCPP_ERROR(
+        get_logger(), "ERROR: Request with RID %ld, transfer failed.",
+        latest_response.request_rid_);
+      ongoing_request_processing = false;
+
+      // return hardware_interface::return_type::ERROR; return error or continue sending commands?
+    }
+  }
+
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  // Joint Commands
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -318,6 +457,60 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     return hardware_interface::return_type::ERROR;
   }
 
+  // IO commands
+
+  // Build the desired mask from the command interfaces
+  int64_t desired_mask = 0;
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (get_command(digital_outputs_itfs_[i]) > 0.5)
+    {
+      desired_mask |= (1LL << i);
+    }
+  }
+
+  bool command_changed = desired_mask != prev_io_cmd_sent;
+
+  // Only send a command if something actually changed AND no request is currently being processed
+  if (command_changed && !ongoing_request_processing)
+  {
+    ongoing_request_processing = true;
+
+    int64_t changed =
+      desired_mask ^ prev_io_cmd_sent;  // which bits changed from the previous command sent
+    int64_t enable_mask = desired_mask & changed;    // which changed bits to turn on
+    int64_t disable_mask = ~desired_mask & changed;  // which changed bits to turn off
+
+    // TODO(habartakh): How to package both enable & disable bits inside the same IO request
+    if (enable_mask)  // Set bits to 1
+    {
+      io_request.asSetIODigitalOut().withEnabledPorts(
+        enable_mask);  // Only send enable OR disable per request
+      ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to enable ports corresponding to the following mask: %ld",
+        io_request.request_rid_, enable_mask);
+
+      prev_io_cmd_sent |= enable_mask;  // mark only enabled bits as sent
+    }
+    else  // Set bits to 0
+    {
+      io_request.asSetIODigitalOut().withDisabledPorts(disable_mask);
+      ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to disable ports corresponding to the following mask: %ld",
+        io_request.request_rid_, disable_mask);
+
+      prev_io_cmd_sent &= ~disable_mask;  // mark only disabled bits as sent
+    }
+
+    pending_io_rid = io_request.request_rid_;      // track the request
+    init_time = std::chrono::steady_clock::now();  // Start the timer
+  }
   return hardware_interface::return_type::OK;
 }
 
