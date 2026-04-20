@@ -190,16 +190,16 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
           if (io_type == "input")
           {
             digital_inputs_itfs_[bit_index] = state_io.name;
-            // RCLCPP_INFO(
-            //   get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
-            //   state_io.name.c_str());
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
+              state_io.name.c_str());
           }
           else if (io_type == "output")
           {
             digital_outputs_itfs_[bit_index] = state_io.name;
-            // RCLCPP_INFO(
-            //   get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
-            //   state_io.name.c_str());
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
+              state_io.name.c_str());
           }
           else
           {
@@ -406,6 +406,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   if (time_elapsed > std::chrono::seconds(1))
   {
     RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
+    ongoing_request_processing = false;
     // return hardware_interface::return_type::ERROR; stop or not?
   }
 
