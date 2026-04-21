@@ -121,7 +121,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     {
       RCLCPP_FATAL(
         get_logger(),
-        "Joint '%s' missing required command interfaces. Expected position, velocity, and "
+        "Joint '%s' missing required state interfaces. Expected position, velocity, and "
         "acceleration.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
@@ -386,7 +386,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   double output_value = 0.0;
 
   // Get the Digital Inputs
-  // TODO(habartakh): How do we manage a scenario for two
+  // TODO(habartakh): How do we manage a scenario for two enable/disable requests
   int64_t digital_input = rcv_iface_->getDigitalInput();
   for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
   {
@@ -396,7 +396,12 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     }
     // Extract the specific bit at i position
     value = (digital_input >> i) & 0x1;
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Boolean input value read: %s", value ? "true" : "false");
+
     input_value = value ? 1.0 : 0.0;
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Double input value read: %f", input_value);
 
     // Set the corresponding state interface with the appropriate value
     set_state(digital_inputs_itfs_[i], input_value);
@@ -412,7 +417,12 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     }
     // Extract the specific bit at i position
     value = (digital_output >> i) & 0x1;
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Boolean output value read: %s", value ? "true" : "false");
+
     output_value = value ? 1.0 : 0.0;
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Double output value read: %f", input_value);
 
     // Set the corresponding state interface with the appropriate value
     set_state(digital_outputs_itfs_[i], output_value);
@@ -421,6 +431,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   // Check if the IO write request is being processed or not
   if (ongoing_request_processing)
   {
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Currently processing request with RID %ld ...",
+      io_request.request_rid_);
+
     auto latest_response = rcv_iface_->getLatestRequest();
 
     // If the 1 second elapsed without confirming reception of the request
@@ -492,6 +506,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     }
     double cmd = get_command(digital_outputs_itfs_[i]);
 
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Output bit %zu cmd: %f", i, cmd);
+
     if (cmd > 0.5)
     {
       desired_mask |= (1LL << i);
@@ -499,6 +515,10 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   }
 
   bool command_changed = desired_mask != prev_io_cmd_sent;
+
+  RCLCPP_INFO_THROTTLE(
+    get_logger(), *get_clock(), 2000, "desired_mask: 0x%016lX, command_changed: %s", desired_mask,
+    command_changed ? "true" : "false");
 
   // Only send a command if something actually changed AND no request is currently being processed
   if (command_changed && !ongoing_request_processing)
@@ -509,6 +529,11 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
       desired_mask ^ prev_io_cmd_sent;  // which bits changed from the previous command sent
     int64_t enable_mask = desired_mask & changed;    // which changed bits to turn on
     int64_t disable_mask = ~desired_mask & changed;  // which changed bits to turn off
+
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000,
+      "changed: 0x%016lX, enable_mask: 0x%016lX, disable_mask: 0x%016lX", changed, enable_mask,
+      disable_mask);
 
     // TODO(habartakh): How to package both enable & disable bits inside the same IO request
     if (enable_mask)  // Set bits to 1
