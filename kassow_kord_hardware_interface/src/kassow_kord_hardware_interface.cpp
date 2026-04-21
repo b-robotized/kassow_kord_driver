@@ -121,7 +121,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     {
       RCLCPP_FATAL(
         get_logger(),
-        "Joint '%s' missing required state interfaces. Expected position, velocity, and "
+        "Joint '%s' missing required command interfaces. Expected position, velocity, and "
         "acceleration.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
@@ -176,30 +176,53 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   //  Populate the GPIO interfaces vectors
   size_t bit_index;
   std::string io_type;
+  RCLCPP_INFO(get_logger(), "Found %zu GPIO component(s) in hardware info", info_.gpios.size());
   for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
   {
+    RCLCPP_INFO(
+      get_logger(), "GPIO component: '%s' — %zu state interface(s)", gpio.name.c_str(),
+      gpio.state_interfaces.size());
     for (const auto & state_io : gpio.state_interfaces)
     {
+      RCLCPP_INFO(get_logger(), "  state_interface name: '%s'", state_io.name.c_str());
       if (state_io.parameters.count("bit_index"))
       {
         bit_index = stoi(state_io.parameters.at("bit_index"));
+        RCLCPP_INFO(get_logger(), "  bit_index: %zu", bit_index);
 
         if (state_io.parameters.count("io_type"))
         {
           io_type = state_io.parameters.at("io_type");
+          RCLCPP_INFO(get_logger(), "  io_type: '%s'", io_type.c_str());
           if (io_type == "input")
           {
-            digital_inputs_itfs_[bit_index] = state_io.name;
+            if (bit_index >= KORD_INPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for input (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_INPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_inputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
             RCLCPP_INFO(
               get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
-              state_io.name.c_str());
+              digital_inputs_itfs_[bit_index].c_str());
           }
           else if (io_type == "output")
           {
-            digital_outputs_itfs_[bit_index] = state_io.name;
+            if (bit_index >= KORD_OUTPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for output (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_OUTPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_outputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
             RCLCPP_INFO(
               get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
-              state_io.name.c_str());
+              digital_outputs_itfs_[bit_index].c_str());
           }
           else
           {
@@ -312,17 +335,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial Outputs and set them as the initial command values
   prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
-  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
-  {
-    // Extract the specific bit at i position
-    bool value = (prev_io_cmd_sent >> i) & 0x1;
-    double output_value = value ? 1.0 : 0.0;
-
-    // Set the corresponding interfaces with the corresponding value
-    set_state(digital_outputs_itfs_[i], output_value);
-    set_command(digital_outputs_itfs_[i], output_value);
-  }
-  ongoing_request_processing = false;  // Initialize before sending requests
+  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", prev_io_cmd_sent);
 
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
@@ -373,11 +386,14 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   double output_value = 0.0;
 
   // Get the Digital Inputs
-  // TODO(habartakh): We already use a command to fetch the data, see if we can fetch all info
-  // TODO(habartakh): at once then parse it later to avoid making multiple requests
+  // TODO(habartakh): How do we manage a scenario for two
   int64_t digital_input = rcv_iface_->getDigitalInput();
   for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
   {
+    if (digital_inputs_itfs_[i].empty())
+    {
+      continue;
+    }
     // Extract the specific bit at i position
     value = (digital_input >> i) & 0x1;
     input_value = value ? 1.0 : 0.0;
@@ -390,6 +406,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   int64_t digital_output = rcv_iface_->getDigitalOutput();
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
+    if (digital_outputs_itfs_[i].empty())
+    {
+      continue;
+    }
     // Extract the specific bit at i position
     value = (digital_output >> i) & 0x1;
     output_value = value ? 1.0 : 0.0;
@@ -399,42 +419,44 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   }
 
   // Check if the IO write request is being processed or not
-  auto latest_response = rcv_iface_->getLatestRequest();
-
-  // If the 1 second elapsed without confirming reception of the request
-  auto time_elapsed = std::chrono::steady_clock::now() - init_time;
-  if (time_elapsed > std::chrono::seconds(1))
+  if (ongoing_request_processing)
   {
-    RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
-    ongoing_request_processing = false;
-    // return hardware_interface::return_type::ERROR; stop or not?
-  }
+    auto latest_response = rcv_iface_->getLatestRequest();
 
-  else  // Timeout not reached yet
-  {
-    // Check if the sent IO request is being evaluated
-    if (io_request.request_rid_ != latest_response.request_rid_)
+    // If the 1 second elapsed without confirming reception of the request
+    auto time_elapsed = std::chrono::steady_clock::now() - init_time;
+    if (time_elapsed > std::chrono::seconds(1))
     {
-      RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
-    }
-
-    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
-    {
-      RCLCPP_INFO(
-        get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
-        latest_response.request_rid_);
-
+      RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
       ongoing_request_processing = false;
+      // return hardware_interface::return_type::ERROR; stop or not?
     }
-
-    if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
+    else  // Timeout not reached yet
     {
-      RCLCPP_ERROR(
-        get_logger(), "ERROR: Request with RID %ld, transfer failed.",
-        latest_response.request_rid_);
-      ongoing_request_processing = false;
+      // Check if the sent IO request is being evaluated
+      if (io_request.request_rid_ != latest_response.request_rid_)
+      {
+        RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
+      }
 
-      // return hardware_interface::return_type::ERROR; return error or continue sending commands?
+      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
+      {
+        RCLCPP_INFO(
+          get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
+          latest_response.request_rid_);
+
+        ongoing_request_processing = false;
+      }
+
+      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
+      {
+        RCLCPP_ERROR(
+          get_logger(), "ERROR: Request with RID %ld, transfer failed.",
+          latest_response.request_rid_);
+        ongoing_request_processing = false;
+
+        // return hardware_interface::return_type::ERROR; return error or continue sending commands?
+      }
     }
   }
 
@@ -464,7 +486,13 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   int64_t desired_mask = 0;
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
-    if (get_command(digital_outputs_itfs_[i]) > 0.5)
+    if (digital_outputs_itfs_[i].empty())
+    {
+      continue;
+    }
+    double cmd = get_command(digital_outputs_itfs_[i]);
+
+    if (cmd > 0.5)
     {
       desired_mask |= (1LL << i);
     }
