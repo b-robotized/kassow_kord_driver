@@ -116,10 +116,8 @@ private:
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
 
   std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
-  // std::array<double, KORD_INPUT_COUNT> digital_inputs_states{};
 
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
-  // std::array<double, KORD_OUTPUT_COUNT> digital_outputs_states{};
 
   int64_t prev_io_cmd_sent;         // Bitmask of the previous IO commands sent
   kr2::kord::RequestIO io_request;  // Request to send output commands

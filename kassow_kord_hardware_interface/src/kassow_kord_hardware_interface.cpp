@@ -396,12 +396,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     }
     // Extract the specific bit at i position
     value = (digital_input >> i) & 0x1;
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "Boolean input value read: %s", value ? "true" : "false");
+    // RCLCPP_INFO_THROTTLE(
+    //   get_logger(), *get_clock(), 2000, "Boolean input value read: %s", value ? "true" :
+    //   "false");
 
     input_value = value ? 1.0 : 0.0;
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "Double input value read: %f", input_value);
+    // RCLCPP_INFO_THROTTLE(
+    //   get_logger(), *get_clock(), 2000, "Double input value read: %f", input_value);
 
     // Set the corresponding state interface with the appropriate value
     set_state(digital_inputs_itfs_[i], input_value);
@@ -417,12 +418,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     }
     // Extract the specific bit at i position
     value = (digital_output >> i) & 0x1;
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "Boolean output value read: %s", value ? "true" : "false");
+    // RCLCPP_INFO_THROTTLE(
+    //   get_logger(), *get_clock(), 2000, "Boolean output value read: %s", value ? "true" :
+    //   "false");
 
     output_value = value ? 1.0 : 0.0;
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "Double output value read: %f", input_value);
+    // RCLCPP_INFO_THROTTLE(
+    //   get_logger(), *get_clock(), 2000, "Double output value read: %f", input_value);
 
     // Set the corresponding state interface with the appropriate value
     set_state(digital_outputs_itfs_[i], output_value);
@@ -506,10 +508,11 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     }
     double cmd = get_command(digital_outputs_itfs_[i]);
 
-    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Output bit %zu cmd: %f", i, cmd);
-
+    // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Output bit %zu cmd: %f", i, cmd);
+    // if cmd == NaN, then cmd > 0.5 returns false, thus never setting the corresponding bit
     if (cmd > 0.5)
     {
+      // Only set bit i to 1 to the existing mask
       desired_mask |= (1LL << i);
     }
   }
@@ -544,7 +547,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
 
       RCLCPP_INFO(
         get_logger(),
-        "Sent request with ID: %ld to enable ports corresponding to the following mask: %ld",
+        "Sent request with ID: %ld to enable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, enable_mask);
 
       prev_io_cmd_sent |= enable_mask;  // mark only enabled bits as sent
@@ -556,7 +559,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
 
       RCLCPP_INFO(
         get_logger(),
-        "Sent request with ID: %ld to disable ports corresponding to the following mask: %ld",
+        "Sent request with ID: %ld to disable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, disable_mask);
 
       prev_io_cmd_sent &= ~disable_mask;  // mark only disabled bits as sent
