@@ -13,6 +13,7 @@
 #include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 /**
@@ -381,52 +382,30 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
-  bool value = false;
-  double input_value = 0.0;
-  double output_value = 0.0;
-
   // Get the Digital Inputs
   // TODO(habartakh): How do we manage a scenario for two enable/disable requests
-  int64_t digital_input = rcv_iface_->getDigitalInput();
+  const uint64_t digital_input = static_cast<uint64_t>(rcv_iface_->getDigitalInput());
   for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
   {
     if (digital_inputs_itfs_[i].empty())
     {
       continue;
     }
-    // Extract the specific bit at i position
-    value = (digital_input >> i) & 0x1;
-    // RCLCPP_INFO_THROTTLE(
-    //   get_logger(), *get_clock(), 2000, "Boolean input value read: %s", value ? "true" :
-    //   "false");
-
-    input_value = value ? 1.0 : 0.0;
-    // RCLCPP_INFO_THROTTLE(
-    //   get_logger(), *get_clock(), 2000, "Double input value read: %f", input_value);
-
-    // Set the corresponding state interface with the appropriate value
+    const bool bit = bit_helpers::get_bit(digital_input, i);
+    const double input_value = bit_helpers::bit_to_double(bit);
     set_state(digital_inputs_itfs_[i], input_value);
   }
 
   // Get the digital Outputs
-  int64_t digital_output = rcv_iface_->getDigitalOutput();
+  const uint64_t digital_output = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
     if (digital_outputs_itfs_[i].empty())
     {
       continue;
     }
-    // Extract the specific bit at i position
-    value = (digital_output >> i) & 0x1;
-    // RCLCPP_INFO_THROTTLE(
-    //   get_logger(), *get_clock(), 2000, "Boolean output value read: %s", value ? "true" :
-    //   "false");
-
-    output_value = value ? 1.0 : 0.0;
-    // RCLCPP_INFO_THROTTLE(
-    //   get_logger(), *get_clock(), 2000, "Double output value read: %f", input_value);
-
-    // Set the corresponding state interface with the appropriate value
+    const bool bit = bit_helpers::get_bit(digital_output, i);
+    const double output_value = bit_helpers::bit_to_double(bit);
     set_state(digital_outputs_itfs_[i], output_value);
   }
 
@@ -444,6 +423,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     if (time_elapsed > std::chrono::seconds(1))
     {
       RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
+
       ongoing_request_processing = false;
       // return hardware_interface::return_type::ERROR; stop or not?
     }
@@ -499,26 +479,20 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   // IO commands
 
   // Build the desired mask from the command interfaces
-  int64_t desired_mask = 0;
+  uint64_t desired_mask = 0;
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
     if (digital_outputs_itfs_[i].empty())
     {
       continue;
     }
-    double cmd = get_command(digital_outputs_itfs_[i]);
+    const double cmd = get_command(digital_outputs_itfs_[i]);
 
-    // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Output bit %zu cmd: %f", i, cmd);
-
-    // if cmd == NaN, then cmd > 0.5 returns false, thus never setting the corresponding bit
-    if (cmd > 0.5)
-    {
-      // Only set bit i to 1 on the existing mask
-      desired_mask |= (1LL << i);
-    }
+    // if cmd == NaN, build_mask leaves the bit unset (NaN > 0.5 is false)
+    desired_mask = bit_helpers::build_mask(desired_mask, i, cmd);
   }
 
-  bool command_changed = desired_mask != prev_io_cmd_sent;
+  const bool command_changed = desired_mask != prev_io_cmd_sent;
 
   RCLCPP_INFO_THROTTLE(
     get_logger(), *get_clock(), 2000, "desired_mask: 0x%016lX, command_changed: %s", desired_mask,
@@ -529,10 +503,9 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   {
     ongoing_request_processing = true;
 
-    int64_t changed =
-      desired_mask ^ prev_io_cmd_sent;  // which bits changed from the previous command sent
-    int64_t enable_mask = desired_mask & changed;    // which changed bits to turn on
-    int64_t disable_mask = ~desired_mask & changed;  // which changed bits to turn off
+    const uint64_t changed = bit_helpers::changed_bits(desired_mask, prev_io_cmd_sent);
+    const uint64_t enable_mask = bit_helpers::enable_bits(desired_mask, changed);
+    const uint64_t disable_mask = bit_helpers::disable_bits(desired_mask, changed);
 
     RCLCPP_INFO_THROTTLE(
       get_logger(), *get_clock(), 2000,
@@ -558,7 +531,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
         "Sent request with ID: %ld to enable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, enable_mask);
 
-      prev_io_cmd_sent |= enable_mask;  // mark only enabled bits as sent
+      bit_helpers::apply_enable(prev_io_cmd_sent, enable_mask);
     }
     else  // Set bits to 0
     {
@@ -570,7 +543,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
         "Sent request with ID: %ld to disable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, disable_mask);
 
-      prev_io_cmd_sent &= ~disable_mask;  // mark only disabled bits as sent
+      bit_helpers::apply_disable(prev_io_cmd_sent, disable_mask);
     }
 
     pending_io_rid = io_request.request_rid_;      // track the request
