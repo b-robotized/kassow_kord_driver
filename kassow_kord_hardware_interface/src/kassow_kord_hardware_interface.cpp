@@ -509,10 +509,11 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     double cmd = get_command(digital_outputs_itfs_[i]);
 
     // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Output bit %zu cmd: %f", i, cmd);
+
     // if cmd == NaN, then cmd > 0.5 returns false, thus never setting the corresponding bit
     if (cmd > 0.5)
     {
-      // Only set bit i to 1 to the existing mask
+      // Only set bit i to 1 on the existing mask
       desired_mask |= (1LL << i);
     }
   }
@@ -538,8 +539,15 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
       "changed: 0x%016lX, enable_mask: 0x%016lX, disable_mask: 0x%016lX", changed, enable_mask,
       disable_mask);
 
-    // TODO(habartakh): How to package both enable & disable bits inside the same IO request
-    if (enable_mask)  // Set bits to 1
+    if (enable_mask && disable_mask)
+    {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "Both enable_mask (0x%016lX) and disable_mask (0x%016lX) are non-zero. "
+        "Simultaneous enable and disable is not supported — skipping IO request.",
+        enable_mask, disable_mask);
+    }
+    else if (enable_mask)  // Set bits to 1
     {
       io_request.asSetIODigitalOut().withEnabledPorts(
         enable_mask);  // Only send enable OR disable per request
