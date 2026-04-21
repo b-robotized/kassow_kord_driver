@@ -104,67 +104,67 @@
       <gpio name="kassow_digital_IOs">
         <!-- Digital Inputs DI01 to DI08 Safe Inputs, DI09 to DI16 Quadrature Inputs-->
 
-        <xacro:io_state_interface name="${prefix}_digital_input_1" io_type="input" bit_index="0"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_2" io_type="input" bit_index="1"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_3" io_type="input" bit_index="2"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_4" io_type="input" bit_index="3"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_5" io_type="input" bit_index="4"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_6" io_type="input" bit_index="5"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_7" io_type="input" bit_index="6"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_8" io_type="input" bit_index="7"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_9" io_type="input" bit_index="8"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_10" io_type="input" bit_index="9"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_11" io_type="input" bit_index="10"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_12" io_type="input" bit_index="11"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_13" io_type="input" bit_index="12"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_14" io_type="input" bit_index="13"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_15" io_type="input" bit_index="14"/>
-        <xacro:io_state_interface name="${prefix}_digital_input_16" io_type="input" bit_index="15"/>
+        <xacro:io_state_interface name="${prefix}_DI_1" io_type="input" bit_index="0"/>
+        <xacro:io_state_interface name="${prefix}_DI_2" io_type="input" bit_index="1"/>
+        <xacro:io_state_interface name="${prefix}_DI_3" io_type="input" bit_index="2"/>
+        <xacro:io_state_interface name="${prefix}_DI_4" io_type="input" bit_index="3"/>
+        <xacro:io_state_interface name="${prefix}_DI_5" io_type="input" bit_index="4"/>
+        <xacro:io_state_interface name="${prefix}_DI_6" io_type="input" bit_index="5"/>
+        <xacro:io_state_interface name="${prefix}_DI_7" io_type="input" bit_index="6"/>
+        <xacro:io_state_interface name="${prefix}_DI_8" io_type="input" bit_index="7"/>
+        <xacro:io_state_interface name="${prefix}_DI_9" io_type="input" bit_index="8"/>
+        <xacro:io_state_interface name="${prefix}_DI_10" io_type="input" bit_index="9"/>
+        <xacro:io_state_interface name="${prefix}_DI_11" io_type="input" bit_index="10"/>
+        <xacro:io_state_interface name="${prefix}_DI_12" io_type="input" bit_index="11"/>
+        <xacro:io_state_interface name="${prefix}_DI_13" io_type="input" bit_index="12"/>
+        <xacro:io_state_interface name="${prefix}_DI_14" io_type="input" bit_index="13"/>
+        <xacro:io_state_interface name="${prefix}_DI_15" io_type="input" bit_index="14"/>
+        <xacro:io_state_interface name="${prefix}_DI_16" io_type="input" bit_index="15"/>
 
 
         <!-- Digital Outputs-->
          <!-- Bit indexes are defined according to the convention used in Kassow API-->
 
         <!-- Digital Relays RELAY1 - RELAY4 - Bit indexes 0 - 3 -->
-        <xacro:io_command_interface name="${prefix}_digital_relay_1" io_type="output" bit_index="0"/>
-        <xacro:io_command_interface name="${prefix}_digital_relay_2" io_type="output" bit_index="1"/>
-        <xacro:io_command_interface name="${prefix}_digital_relay_3" io_type="output" bit_index="2"/>
-        <xacro:io_command_interface name="${prefix}_digital_relay_4" io_type="output" bit_index="3"/>
+        <xacro:io_command_interface name="${prefix}_RELAY_1" io_type="output" bit_index="0"/>
+        <xacro:io_command_interface name="${prefix}_RELAY_2" io_type="output" bit_index="1"/>
+        <xacro:io_command_interface name="${prefix}_RELAY_3" io_type="output" bit_index="2"/>
+        <xacro:io_command_interface name="${prefix}_RELAY_4" io_type="output" bit_index="3"/>
 
-        <xacro:io_state_interface name="${prefix}_digital_relay_1" io_type="output" bit_index="0"/>
-        <xacro:io_state_interface name="${prefix}_digital_relay_2" io_type="output" bit_index="1"/>
-        <xacro:io_state_interface name="${prefix}_digital_relay_3" io_type="output" bit_index="2"/>
-        <xacro:io_state_interface name="${prefix}_digital_relay_4" io_type="output" bit_index="3"/>
+        <xacro:io_state_interface name="${prefix}_RELAY_1" io_type="output" bit_index="0"/>
+        <xacro:io_state_interface name="${prefix}_RELAY_2" io_type="output" bit_index="1"/>
+        <xacro:io_state_interface name="${prefix}_RELAY_3" io_type="output" bit_index="2"/>
+        <xacro:io_state_interface name="${prefix}_RELAY_4" io_type="output" bit_index="3"/>
 
         <!-- Digital IO Board DO1 - DO8 - Bit indexes 4 - 11 -->
-        <xacro:io_command_interface name="${prefix}_digital_output_1" io_type="output" bit_index="4"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_2" io_type="output" bit_index="5"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_3" io_type="output" bit_index="6"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_4" io_type="output" bit_index="7"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_5" io_type="output" bit_index="8"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_6" io_type="output" bit_index="9"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_7" io_type="output" bit_index="10"/>
-        <xacro:io_command_interface name="${prefix}_digital_output_8" io_type="output" bit_index="11"/>
+        <xacro:io_command_interface name="${prefix}_DO_1" io_type="output" bit_index="4"/>
+        <xacro:io_command_interface name="${prefix}_DO_2" io_type="output" bit_index="5"/>
+        <xacro:io_command_interface name="${prefix}_DO_3" io_type="output" bit_index="6"/>
+        <xacro:io_command_interface name="${prefix}_DO_4" io_type="output" bit_index="7"/>
+        <xacro:io_command_interface name="${prefix}_DO_5" io_type="output" bit_index="8"/>
+        <xacro:io_command_interface name="${prefix}_DO_6" io_type="output" bit_index="9"/>
+        <xacro:io_command_interface name="${prefix}_DO_7" io_type="output" bit_index="10"/>
+        <xacro:io_command_interface name="${prefix}_DO_8" io_type="output" bit_index="11"/>
 
-        <xacro:io_state_interface name="${prefix}_digital_output_1" io_type="output" bit_index="4"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_2" io_type="output" bit_index="5"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_3" io_type="output" bit_index="6"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_4" io_type="output" bit_index="7"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_5" io_type="output" bit_index="8"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_6" io_type="output" bit_index="9"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_7" io_type="output" bit_index="10"/>
-        <xacro:io_state_interface name="${prefix}_digital_output_8" io_type="output" bit_index="11"/>
+        <xacro:io_state_interface name="${prefix}_DO_1" io_type="output" bit_index="4"/>
+        <xacro:io_state_interface name="${prefix}_DO_2" io_type="output" bit_index="5"/>
+        <xacro:io_state_interface name="${prefix}_DO_3" io_type="output" bit_index="6"/>
+        <xacro:io_state_interface name="${prefix}_DO_4" io_type="output" bit_index="7"/>
+        <xacro:io_state_interface name="${prefix}_DO_5" io_type="output" bit_index="8"/>
+        <xacro:io_state_interface name="${prefix}_DO_6" io_type="output" bit_index="9"/>
+        <xacro:io_state_interface name="${prefix}_DO_7" io_type="output" bit_index="10"/>
+        <xacro:io_state_interface name="${prefix}_DO_8" io_type="output" bit_index="11"/>
 
         <!-- Digital IO ToolB TB1 - TB4 - Bit indexes 12 - 15 -->
-        <xacro:io_command_interface name="${prefix}_digital_tb_1" io_type="output" bit_index="12"/>
-        <xacro:io_command_interface name="${prefix}_digital_tb_2" io_type="output" bit_index="13"/>
-        <xacro:io_command_interface name="${prefix}_digital_tb_3" io_type="output" bit_index="14"/>
-        <xacro:io_command_interface name="${prefix}_digital_tb_4" io_type="output" bit_index="15"/>
+        <xacro:io_command_interface name="${prefix}_TB_1" io_type="output" bit_index="12"/>
+        <xacro:io_command_interface name="${prefix}_TB_2" io_type="output" bit_index="13"/>
+        <xacro:io_command_interface name="${prefix}_TB_3" io_type="output" bit_index="14"/>
+        <xacro:io_command_interface name="${prefix}_TB_4" io_type="output" bit_index="15"/>
 
-        <xacro:io_state_interface name="${prefix}_digital_tb_1" io_type="output" bit_index="12"/>
-        <xacro:io_state_interface name="${prefix}_digital_tb_2" io_type="output" bit_index="13"/>
-        <xacro:io_state_interface name="${prefix}_digital_tb_3" io_type="output" bit_index="14"/>
-        <xacro:io_state_interface name="${prefix}_digital_tb_4" io_type="output" bit_index="15"/>
+        <xacro:io_state_interface name="${prefix}_TB_1" io_type="output" bit_index="12"/>
+        <xacro:io_state_interface name="${prefix}_TB_2" io_type="output" bit_index="13"/>
+        <xacro:io_state_interface name="${prefix}_TB_3" io_type="output" bit_index="14"/>
+        <xacro:io_state_interface name="${prefix}_TB_4" io_type="output" bit_index="15"/>
 
       </gpio>
 
