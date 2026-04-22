@@ -424,6 +424,8 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     {
       RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
 
+      pending_enable_mask = 0;
+      pending_disable_mask = 0;
       ongoing_request_processing = false;
       // return hardware_interface::return_type::ERROR; stop or not?
     }
@@ -441,6 +443,11 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
           get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
           latest_response.request_rid_);
 
+        // Apply only ONE mask on previous command
+        bit_helpers::apply_enable(prev_io_cmd_sent, pending_enable_mask);
+        bit_helpers::apply_disable(prev_io_cmd_sent, pending_disable_mask);
+        pending_enable_mask = 0;
+        pending_disable_mask = 0;
         ongoing_request_processing = false;
       }
 
@@ -449,6 +456,9 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
         RCLCPP_ERROR(
           get_logger(), "ERROR: Request with RID %ld, transfer failed.",
           latest_response.request_rid_);
+
+        pending_enable_mask = 0;
+        pending_disable_mask = 0;
         ongoing_request_processing = false;
 
         // return hardware_interface::return_type::ERROR; return error or continue sending commands?
@@ -531,7 +541,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
         "Sent request with ID: %ld to enable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, enable_mask);
 
-      bit_helpers::apply_enable(prev_io_cmd_sent, enable_mask);
+      pending_enable_mask = enable_mask;
+      pending_disable_mask = 0;
     }
     else  // Set bits to 0
     {
@@ -543,7 +554,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
         "Sent request with ID: %ld to disable ports corresponding to the following mask: 0x%016lX",
         io_request.request_rid_, disable_mask);
 
-      bit_helpers::apply_disable(prev_io_cmd_sent, disable_mask);
+      pending_disable_mask = disable_mask;
+      pending_enable_mask = 0;
     }
 
     pending_io_rid = io_request.request_rid_;      // track the request
