@@ -175,7 +175,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
-  // TODO(habartakh): Search for more exceptions/error scenarios
   //  Populate the GPIO interfaces vectors
   size_t bit_index;
   std::string io_type;
@@ -445,8 +444,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
           get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
           latest_response.request_rid_);
 
+        // Mark enabled / disabled bits as sent
         prev_io_cmd_sent |= pending_enable_mask;
         prev_io_cmd_sent &= ~pending_disable_mask;
+
         pending_enable_mask = 0;
         pending_disable_mask = 0;
         ongoing_request_processing = false;
@@ -490,8 +491,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   // IO commands
 
   // Build the desired mask from the command interfaces
-  uint64_t desired_mask = 0;
-  bool io_cmd_has_nan = false;
+  uint64_t desired_mask = prev_io_cmd_sent;
 
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
@@ -504,8 +504,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
 
     if (std::isnan(cmd))
     {
-      io_cmd_has_nan = true;  // Raise a flag
-      break;
+      // NaN means no command was set for this output, leave the bit unchanged
+      continue;
     }
     if (cmd > 0.5)
     {
@@ -515,13 +515,6 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     {
       desired_mask = bit_helpers::clear(desired_mask, i);  // turn off bit i
     }
-  }
-
-  if (io_cmd_has_nan)
-  {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 2000, "IO command contains NaN — skipping IO request.");
-    return hardware_interface::return_type::OK;
   }
 
   const bool command_changed = desired_mask != prev_io_cmd_sent;
