@@ -12,7 +12,10 @@
 
 #include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
+#include <cmath>
+
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 /**
@@ -172,6 +175,82 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
+  //  Populate the GPIO interfaces vectors
+  size_t bit_index;
+  std::string io_type;
+  RCLCPP_INFO(get_logger(), "Found %zu GPIO component(s) in hardware info", info_.gpios.size());
+  for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
+  {
+    RCLCPP_INFO(
+      get_logger(), "GPIO component: '%s' — %zu state interface(s)", gpio.name.c_str(),
+      gpio.state_interfaces.size());
+    for (const auto & state_io : gpio.state_interfaces)
+    {
+      RCLCPP_INFO(get_logger(), "  state_interface name: '%s'", state_io.name.c_str());
+      if (state_io.parameters.count("bit_index"))
+      {
+        bit_index = stoi(state_io.parameters.at("bit_index"));
+        RCLCPP_INFO(get_logger(), "  bit_index: %zu", bit_index);
+
+        if (state_io.parameters.count("io_type"))
+        {
+          io_type = state_io.parameters.at("io_type");
+          RCLCPP_INFO(get_logger(), "  io_type: '%s'", io_type.c_str());
+          if (io_type == "input")
+          {
+            if (bit_index >= KORD_INPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for input (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_INPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_inputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
+              digital_inputs_itfs_[bit_index].c_str());
+          }
+          else if (io_type == "output")
+          {
+            if (bit_index >= KORD_OUTPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for output (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_OUTPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_outputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
+              digital_outputs_itfs_[bit_index].c_str());
+          }
+          else
+          {
+            RCLCPP_ERROR(
+              get_logger(), "Unknown io_type for state_interface '%s'", state_io.name.c_str());
+            return hardware_interface::CallbackReturn::ERROR;
+          }
+        }
+        else
+        {
+          RCLCPP_ERROR(
+            get_logger(), "state_interface '%s' is missing required parameter 'io_type'",
+            state_io.name.c_str());
+          return hardware_interface::CallbackReturn::ERROR;
+        }
+      }
+      else
+      {
+        RCLCPP_ERROR(
+          get_logger(), "state_interface '%s' is missing required parameter 'bit_index'",
+          state_io.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -255,6 +334,11 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
+
+  // Read initial Outputs and set them as the initial command values
+  prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
+  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", prev_io_cmd_sent);
+
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -299,12 +383,98 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
+  // Get the Digital Inputs
+  // TODO(habartakh): How do we manage a scenario for two enable/disable requests
+  const uint64_t digital_input = static_cast<uint64_t>(rcv_iface_->getDigitalInput());
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
+  {
+    if (digital_inputs_itfs_[i].empty())
+    {
+      continue;
+    }
+    const bool bit = bit_helpers::is_set(digital_input, i);
+    const double input_value = bit_helpers::bit_to_double(bit);
+    set_state(digital_inputs_itfs_[i], input_value);
+  }
+
+  // Get the digital Outputs
+  const uint64_t digital_output = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (digital_outputs_itfs_[i].empty())
+    {
+      continue;
+    }
+    const bool bit = bit_helpers::is_set(digital_output, i);
+    const double output_value = bit_helpers::bit_to_double(bit);
+    set_state(digital_outputs_itfs_[i], output_value);
+  }
+
+  // Check if the IO write request is being processed or not
+  if (ongoing_request_processing)
+  {
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "Currently processing request with RID %ld ...",
+      io_request.request_rid_);
+
+    auto latest_response = rcv_iface_->getLatestRequest();
+
+    // If the 1 second elapsed without confirming reception of the request
+    auto time_elapsed = std::chrono::steady_clock::now() - init_time;
+    if (time_elapsed > std::chrono::seconds(1))
+    {
+      RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
+
+      pending_enable_mask = 0;
+      pending_disable_mask = 0;
+      ongoing_request_processing = false;
+      // return hardware_interface::return_type::ERROR; stop or not?
+    }
+    else  // Timeout not reached yet
+    {
+      // Check if the sent IO request is being evaluated
+      if (io_request.request_rid_ != latest_response.request_rid_)
+      {
+        RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
+      }
+
+      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
+      {
+        RCLCPP_INFO(
+          get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
+          latest_response.request_rid_);
+
+        // Mark enabled / disabled bits as sent
+        prev_io_cmd_sent |= pending_enable_mask;
+        prev_io_cmd_sent &= ~pending_disable_mask;
+
+        pending_enable_mask = 0;
+        pending_disable_mask = 0;
+        ongoing_request_processing = false;
+      }
+
+      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
+      {
+        RCLCPP_ERROR(
+          get_logger(), "ERROR: Request with RID %ld, transfer failed.",
+          latest_response.request_rid_);
+
+        pending_enable_mask = 0;
+        pending_disable_mask = 0;
+        ongoing_request_processing = false;
+
+        // return hardware_interface::return_type::ERROR; return error or continue sending commands?
+      }
+    }
+  }
+
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  // Joint Commands
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -318,6 +488,94 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     return hardware_interface::return_type::ERROR;
   }
 
+  // IO commands
+
+  // Build the desired mask from the command interfaces
+  uint64_t desired_mask = prev_io_cmd_sent;
+
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (digital_outputs_itfs_[i].empty())
+    {
+      continue;
+    }
+
+    const double cmd = get_command(digital_outputs_itfs_[i]);
+
+    if (std::isnan(cmd))
+    {
+      // NaN means no command was set for this output, leave the bit unchanged
+      continue;
+    }
+    if (cmd > 0.5)
+    {
+      desired_mask = bit_helpers::set(desired_mask, i);  // turn on bit i
+    }
+    else
+    {
+      desired_mask = bit_helpers::clear(desired_mask, i);  // turn off bit i
+    }
+  }
+
+  const bool command_changed = desired_mask != prev_io_cmd_sent;
+
+  RCLCPP_INFO_THROTTLE(
+    get_logger(), *get_clock(), 2000, "desired_mask: 0x%016lX, command_changed: %s", desired_mask,
+    command_changed ? "true" : "false");
+
+  // Only send a command if something actually changed AND no request is currently being processed
+  if (command_changed && !ongoing_request_processing)
+  {
+    ongoing_request_processing = true;
+
+    const uint64_t enable_mask = bit_helpers::get_bits_to_enable(desired_mask, prev_io_cmd_sent);
+    const uint64_t disable_mask = bit_helpers::get_bits_to_disable(desired_mask, prev_io_cmd_sent);
+
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000, "enable_mask: 0x%016lX, disable_mask: 0x%016lX",
+      enable_mask, disable_mask);
+
+    if (enable_mask && disable_mask)
+    {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "Both enable_mask (0x%016lX) and disable_mask (0x%016lX) are non-zero. "
+        "Simultaneous enable and disable is not supported — skipping IO request.",
+        enable_mask, disable_mask);
+
+      return hardware_interface::return_type::OK;
+    }
+    else if (enable_mask)  // Set bits to 1
+    {
+      io_request.asSetIODigitalOut().withEnabledPorts(
+        enable_mask);  // Only send enable OR disable per request
+      ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to enable ports corresponding to the following mask: 0x%016lX",
+        io_request.request_rid_, enable_mask);
+
+      pending_enable_mask = enable_mask;
+      pending_disable_mask = 0;
+    }
+    else  // Set bits to 0
+    {
+      io_request.asSetIODigitalOut().withDisabledPorts(disable_mask);
+      ctl_iface_->transmitRequest(io_request);
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Sent request with ID: %ld to disable ports corresponding to the following mask: 0x%016lX",
+        io_request.request_rid_, disable_mask);
+
+      pending_disable_mask = disable_mask;
+      pending_enable_mask = 0;
+    }
+
+    pending_io_rid = io_request.request_rid_;      // track the request
+    init_time = std::chrono::steady_clock::now();  // Start the timer
+  }
   return hardware_interface::return_type::OK;
 }
 
