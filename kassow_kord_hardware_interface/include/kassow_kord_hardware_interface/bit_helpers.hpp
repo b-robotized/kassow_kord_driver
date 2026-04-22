@@ -9,6 +9,7 @@
 #ifndef KASSOW_KORD_HARDWARE_INTERFACE__BIT_HELPERS_HPP_
 #define KASSOW_KORD_HARDWARE_INTERFACE__BIT_HELPERS_HPP_
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -26,9 +27,13 @@ inline uint64_t set_bit(uint64_t mask, size_t i) { return mask | (1ULL << i); }
 // Return a new mask with bit i cleared to 0.
 inline uint64_t clear_bit(uint64_t mask, size_t i) { return mask & ~(1ULL << i); }
 
-// Set bit i in mask if cmd > 0.5, otherwise leave it unchanged.
-inline uint64_t build_mask(uint64_t mask, size_t i, double cmd)
+// Set bit i if cmd > 0.5. If cmd is NaN, preserve bit i from prev. Otherwise leave bit cleared.
+inline uint64_t build_mask(uint64_t mask, size_t i, double cmd, uint64_t prev = 0)
 {
+  if (std::isnan(cmd))
+  {
+    return get_bit(prev, i) ? set_bit(mask, i) : mask;
+  }
   return cmd > 0.5 ? set_bit(mask, i) : mask;
 }
 
