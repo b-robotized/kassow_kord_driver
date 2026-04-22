@@ -12,6 +12,8 @@
 
 #include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
+#include <cmath>
+
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -391,7 +393,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     {
       continue;
     }
-    const bool bit = bit_helpers::get_bit(digital_input, i);
+    const bool bit = bit_helpers::is_set(digital_input, i);
     const double input_value = bit_helpers::bit_to_double(bit);
     set_state(digital_inputs_itfs_[i], input_value);
   }
@@ -404,7 +406,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     {
       continue;
     }
-    const bool bit = bit_helpers::get_bit(digital_output, i);
+    const bool bit = bit_helpers::is_set(digital_output, i);
     const double output_value = bit_helpers::bit_to_double(bit);
     set_state(digital_outputs_itfs_[i], output_value);
   }
@@ -443,9 +445,8 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
           get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
           latest_response.request_rid_);
 
-        // Apply only ONE mask on previous command
-        bit_helpers::apply_enable(prev_io_cmd_sent, pending_enable_mask);
-        bit_helpers::apply_disable(prev_io_cmd_sent, pending_disable_mask);
+        prev_io_cmd_sent |= pending_enable_mask;
+        prev_io_cmd_sent &= ~pending_disable_mask;
         pending_enable_mask = 0;
         pending_disable_mask = 0;
         ongoing_request_processing = false;
@@ -490,16 +491,37 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
 
   // Build the desired mask from the command interfaces
   uint64_t desired_mask = 0;
+  bool io_cmd_has_nan = false;
+
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
     if (digital_outputs_itfs_[i].empty())
     {
       continue;
     }
+
     const double cmd = get_command(digital_outputs_itfs_[i]);
 
-    // if cmd == NaN, build_mask leaves the bit unset (NaN > 0.5 is false)
-    desired_mask = bit_helpers::build_mask(desired_mask, i, cmd, prev_io_cmd_sent);
+    if (std::isnan(cmd))
+    {
+      io_cmd_has_nan = true;  // Raise a flag
+      break;
+    }
+    if (cmd > 0.5)
+    {
+      desired_mask = bit_helpers::set(desired_mask, i);  // turn on bit i
+    }
+    else
+    {
+      desired_mask = bit_helpers::clear(desired_mask, i);  // turn off bit i
+    }
+  }
+
+  if (io_cmd_has_nan)
+  {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 2000, "IO command contains NaN — skipping IO request.");
+    return hardware_interface::return_type::OK;
   }
 
   const bool command_changed = desired_mask != prev_io_cmd_sent;
@@ -513,14 +535,12 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   {
     ongoing_request_processing = true;
 
-    const uint64_t changed = bit_helpers::changed_bits(desired_mask, prev_io_cmd_sent);
-    const uint64_t enable_mask = bit_helpers::enable_bits(desired_mask, changed);
-    const uint64_t disable_mask = bit_helpers::disable_bits(desired_mask, changed);
+    const uint64_t enable_mask = bit_helpers::get_bits_to_enable(desired_mask, prev_io_cmd_sent);
+    const uint64_t disable_mask = bit_helpers::get_bits_to_disable(desired_mask, prev_io_cmd_sent);
 
     RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000,
-      "changed: 0x%016lX, enable_mask: 0x%016lX, disable_mask: 0x%016lX", changed, enable_mask,
-      disable_mask);
+      get_logger(), *get_clock(), 2000, "enable_mask: 0x%016lX, disable_mask: 0x%016lX",
+      enable_mask, disable_mask);
 
     if (enable_mask && disable_mask)
     {
@@ -529,6 +549,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
         "Both enable_mask (0x%016lX) and disable_mask (0x%016lX) are non-zero. "
         "Simultaneous enable and disable is not supported — skipping IO request.",
         enable_mask, disable_mask);
+
+      return hardware_interface::return_type::OK;
     }
     else if (enable_mask)  // Set bits to 1
     {
