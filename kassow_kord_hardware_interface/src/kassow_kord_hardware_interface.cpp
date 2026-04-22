@@ -499,7 +499,7 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     const double cmd = get_command(digital_outputs_itfs_[i]);
 
     // if cmd == NaN, build_mask leaves the bit unset (NaN > 0.5 is false)
-    desired_mask = bit_helpers::build_mask(desired_mask, i, cmd);
+    desired_mask = bit_helpers::build_mask(desired_mask, i, cmd, prev_io_cmd_sent);
   }
 
   const bool command_changed = desired_mask != prev_io_cmd_sent;
