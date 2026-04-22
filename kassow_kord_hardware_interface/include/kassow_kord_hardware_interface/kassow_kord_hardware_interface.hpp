@@ -119,9 +119,11 @@ private:
 
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
 
-  uint64_t prev_io_cmd_sent;        // Bitmask of the previous IO commands sent
-  kr2::kord::RequestIO io_request;  // Request to send output commands
-  int64_t pending_io_rid;           // Identifier of the latest write request sent
+  uint64_t prev_io_cmd_sent;         // Bitmask of the previous IO commands sent
+  uint64_t pending_enable_mask{0};   // Enable mask awaiting hardware confirmation
+  uint64_t pending_disable_mask{0};  // Disable mask awaiting hardware confirmation
+  kr2::kord::RequestIO io_request;   // Request to send output commands
+  int64_t pending_io_rid;            // Identifier of the latest write request sent
   std::chrono::time_point<std::chrono::steady_clock>
     init_time;  // Timer starting point to calculate timeout for outputs setup
   bool ongoing_request_processing;
