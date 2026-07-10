@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <robot name="kr2_robot_a810" model="a810" model-revision="051020-0" mechanical-revision="5" features="TIO" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="kr810_description" params="prefix parent *origin">
+  <xacro:macro name="kassow_robot" params="prefix parent *origin">
 
   <!-- globals -->
   <xacro:property name="joints_damping" value="0.1" />
@@ -77,7 +77,7 @@
       xyz="0 0 0"
       rpy="0 0 0"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Base.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Base.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -101,7 +101,7 @@
       xyz="0 0 0.169"
       rpy="0 0 0"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link2.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link2.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -143,7 +143,7 @@
       xyz="0.049 0 0"
       rpy="-${pi/2} 0 -${pi/2}"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link3.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link3.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -168,7 +168,7 @@
       xyz="-0.05 -0.0 0.315"
       rpy="${pi/2} 0 -${pi/2}"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link4.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link4.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -210,7 +210,7 @@
       xyz="0.04 0.0005 0.0"
       rpy="-${pi/2} 0 ${pi/2}"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link5.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link5.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -232,7 +232,7 @@
       xyz="0.0 0.002 0.1035"
       rpy="0 0 -${pi/2}"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link6.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link6.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -272,7 +272,7 @@
       xyz="0.0 0.0 0.0"
       rpy="0 0 0"
       color="0.2 0.2 0.2 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_Link7.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_Link7.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
@@ -296,7 +296,7 @@
       xyz="0.0 -0.0 0.0"
       rpy="0 0 0"
       color="0.8 0.8 0.8 1"
-      mesh_file="package://kassow_kord_description/kr810/meshes/a810/a810_ToolIO.stl"
+      mesh_file="package://kassow_kord_description/kr810/meshes/collision/a810_ToolIO.stl"
       scale="0.001 0.001 0.001"/>
   </link>
 
