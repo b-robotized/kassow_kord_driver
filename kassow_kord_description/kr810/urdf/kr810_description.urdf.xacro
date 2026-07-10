@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <robot name="kr2_robot_a810" model="a810" model-revision="051020-0" mechanical-revision="5" features="TIO" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="kassow_robot" params="prefix parent *origin">
+  <xacro:macro name="kr810_description" params="prefix parent *origin">
 
   <!-- globals -->
   <xacro:property name="joints_damping" value="0.1" />

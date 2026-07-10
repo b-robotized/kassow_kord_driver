@@ -6,17 +6,18 @@
   <xacro:arg name="ip_address" default="10.23.23.238"/>
   <xacro:arg name="port" default="28283"/>
   <xacro:arg name="session_id" default="1"/>
+  <xacro:arg name="robot_model" default="kr810"/>
 
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/inertials.xacro" />
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/materials.xacro" />
-  <xacro:include filename="$(find kassow_kord_description)/kr810/urdf/kr810_description.urdf.xacro"/>
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/kassow_kord.ros2_control.xacro"/>
 
   <link name="world"/>
 
-  <xacro:kr810_description prefix="$(arg prefix)" parent="world">
+  <xacro:include filename="$(find kassow_kord_description)/$(arg robot_model)/urdf/$(arg robot_model)_description.urdf.xacro"/>
+  <xacro:call macro="$(arg robot_model)_description" prefix="$(arg prefix)" parent="world">
     <origin xyz="0 0 0" rpy="0 0 0"/>
-  </xacro:kr810_description>
+  </xacro:call>
 
   <xacro:kassow_kord_ros2_control
     name="$(arg prefix)"
