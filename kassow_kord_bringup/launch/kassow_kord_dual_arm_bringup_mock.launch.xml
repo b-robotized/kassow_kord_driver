@@ -20,13 +20,17 @@
 <launch>
   <arg name="configuration_package" default="kassow_kord_bringup" description="The ROS package where we find the configuration files."/>
   <arg name="use_mock_hardware" default="true" description="Whether to use mock hardware or real hardware."/>
-
+  <arg name="robot_1_model" default="kr810" description="The Kassow robot model to use."/>
+  <arg name="robot_2_model" default="kr810" description="The Kassow robot model to use."/>
   <arg name="start_rviz" default="true" description="Launch RViz visualization?"/>
 
   <let name="prefix" value=""/>
   <let name="controllers_file_path" value="$(find-pkg-share $(var configuration_package))/config/kassow_kord_controllers.yaml"/>
 
-  <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_dual_arm_description.launch.xml"/>
+  <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_dual_arm_description.launch.xml">
+    <arg name="robot_1_model" value="$(var robot_1_model)"/>
+    <arg name="robot_2_model" value="$(var robot_2_model)"/>
+  </include>
 
   <node pkg="controller_manager" exec="ros2_control_node" name="b_controlled_box_cm" output="both">
     <param name="update_rate" value="250"/>

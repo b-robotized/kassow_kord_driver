@@ -21,8 +21,13 @@
 <launch>
   <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
   <arg name="description_file" default="kassow_kord_dual_arm" description="URDF/XACRO description file with the robot."/>
+  <arg name="robot_1_model" default="kr810" description="The Kassow robot model to use."/>
+  <arg name="robot_2_model" default="kr810" description="The Kassow robot model to use."/>
 
-  <include file="$(find-pkg-share $(var description_package))/launch/kassow_kord_description_dual_arm.launch.xml"/>
+  <include file="$(find-pkg-share $(var description_package))/launch/kassow_kord_dual_arm_description.launch.xml">
+    <arg name="robot_1_model" value="$(var robot_1_model)"/>
+    <arg name="robot_2_model" value="$(var robot_2_model)"/>
+  </include>
 
   <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" name="joint_state_publisher_node"/>
 

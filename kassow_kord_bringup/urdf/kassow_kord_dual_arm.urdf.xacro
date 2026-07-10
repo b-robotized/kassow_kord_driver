@@ -2,12 +2,14 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
   <xacro:arg name="use_mock_hardware" default="true"/>
-
+  
+  <xacro:arg name="robot_1_model" default="kr810"/>
   <xacro:arg name="robot_1_prefix" default="kassow_right"/>
   <xacro:arg name="robot_1_ip" default="10.23.23.204"/>
   <xacro:arg name="robot_1_port" default="28283"/>
   <xacro:arg name="robot_1_session_id" default="1"/>
-
+  
+  <xacro:arg name="robot_2_model" default="kr810"/>
   <xacro:arg name="robot_2_prefix" default="kassow_left"/>
   <xacro:arg name="robot_2_ip" default="10.23.23.205"/>
   <xacro:arg name="robot_2_port" default="28284"/>
@@ -21,9 +23,10 @@
   <link name="world"/>
 
   <!-- KASSOW 1 -->
-  <xacro:kr810_description prefix="$(arg robot_1_prefix)" parent="world">
+  <xacro:include filename="$(find kassow_kord_description)/$(arg robot_1_model)/urdf/$(arg robot_1_model)_description.urdf.xacro"/>
+  <xacro:call macro="$(arg robot_1_model)_description" prefix="$(arg robot_1_prefix)" parent="world">
     <origin xyz="0 1.0 0" rpy="0 0 0"/>
-  </xacro:kr810_description>
+  </xacro:call>
 
   <xacro:kassow_kord_ros2_control
     name="$(arg robot_1_prefix)"
@@ -35,9 +38,10 @@
   />
 
   <!-- KASSOW 2 -->
-  <xacro:kr810_description prefix="$(arg robot_2_prefix)" parent="world">
+  <xacro:include filename="$(find kassow_kord_description)/$(arg robot_2_model)/urdf/$(arg robot_2_model)_description.urdf.xacro"/>
+  <xacro:call macro="$(arg robot_2_model)_description" prefix="$(arg robot_2_prefix)" parent="world">
     <origin xyz="0 -1.0 0" rpy="0 0 0"/>
-  </xacro:kr810_description>
+  </xacro:call>
 
   <xacro:kassow_kord_ros2_control
     name="$(arg robot_2_prefix)"
