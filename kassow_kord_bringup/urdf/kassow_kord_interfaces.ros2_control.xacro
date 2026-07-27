@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="io_state_interface" params="name io_type bit_index data_type:=double">
+    <state_interface name="${name}" data_type="${data_type}">
+      <param name="io_type">${io_type}</param>
+      <param name="bit_index">${bit_index}</param>
+    </state_interface>
+  </xacro:macro>
+
+  <xacro:macro name="io_command_interface" params="name io_type bit_index data_type:=double">
+    <command_interface name="${name}" data_type="${data_type}">
+      <param name="io_type">${io_type}</param>
+      <param name="bit_index">${bit_index}</param>
+    </command_interface>
+  </xacro:macro>
+
+</robot>
