@@ -196,6 +196,15 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
       get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
   }
 
+  if (ros_services_executor_.is_spinning()) {
+      ros_services_executor_.cancel();
+  }
+  if (ros_services_thread_.joinable()) {
+      ros_services_thread_.join();
+  }
+  ros_services_.reset();
+  ros_services_node_.reset();
+
   kord_->disconnect();
 
   RCLCPP_INFO(get_logger(), "Successfully cleaned up");
@@ -213,6 +222,15 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot.");
     return hardware_interface::CallbackReturn::ERROR;
   }
+
+  // async services
+  ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name);
+  ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_);
+  ros_services_executor_.add_node(ros_services_node_);
+  ros_services_thread_ = std::thread([this]() {
+      // set thread priorities here!
+      ros_services_executor_.spin();
+  });
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -263,6 +281,10 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  if (ros_services_) {
+      ros_services_->abortActiveServices();
+  }
+
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
   return CallbackReturn::SUCCESS;
 }
@@ -297,6 +319,19 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
+  }
+
+  if (ros_services_) {
+      const auto& kord_services = ros_services_->get_kord_services().as_array();
+      
+      for (auto* service : kord_services) {
+          KordServiceState state = service->get_state();
+          if (state == KordServiceState::REQUESTED) {
+              service->dispatch(*ctl_iface_);
+          } else if (state == KordServiceState::DISPATCHED) {
+              service->poll(*rcv_iface_);
+          }
+      }
   }
 
   return hardware_interface::return_type::OK;

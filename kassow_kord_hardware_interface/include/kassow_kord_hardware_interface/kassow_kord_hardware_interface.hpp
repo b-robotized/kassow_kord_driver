@@ -34,6 +34,8 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
+#include "kassow_ros_services.hpp"
+
 namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
@@ -116,6 +118,14 @@ private:
   int session_id;
   int port;
   int waitSync_timeout_ms;
+
+  // Async services:
+  std::unique_ptr<KassowRosServices> ros_services_;
+  rclcpp::Node::SharedPtr ros_services_node_;
+  std::thread ros_services_thread_;
+  // IMPORTANT: when we add other services, we are assuming KORD-API can take multiple concurrent services
+  // if not, we gotta lock mutex to ensure only one gets called at a time.
+  rclcpp::executors::MultiThreadedExecutor ros_services_executor_;
 };
 
 }  // namespace kassow_kord_hardware_interface

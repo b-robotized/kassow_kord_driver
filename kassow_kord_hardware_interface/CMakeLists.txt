@@ -15,6 +15,7 @@ set(THIS_PACKAGE_DEPS
   rclcpp
   rclcpp_lifecycle
   kassow_kord_vendor
+  control_msgs
 )
 
 # find dependencies
@@ -41,6 +42,7 @@ target_link_libraries(${PROJECT_NAME}
     rclcpp::rclcpp
     rclcpp_lifecycle::rclcpp_lifecycle
     kord-api::kord-api
+    ${control_msgs_TARGETS}
 )
 
 # prevent pluginlib from using boost

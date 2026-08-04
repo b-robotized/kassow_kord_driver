@@ -23,6 +23,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>kassow_kord_vendor</depend>
+  <depend>control_msgs</depend>
 
   <exec_depend>controller_manager</exec_depend>
 
