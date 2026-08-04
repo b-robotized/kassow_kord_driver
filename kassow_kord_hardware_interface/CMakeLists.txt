@@ -16,6 +16,7 @@ set(THIS_PACKAGE_DEPS
   rclcpp_lifecycle
   kassow_kord_vendor
   control_msgs
+  realtime_tools
 )
 
 # find dependencies
@@ -42,6 +43,7 @@ target_link_libraries(${PROJECT_NAME}
     rclcpp::rclcpp
     rclcpp_lifecycle::rclcpp_lifecycle
     kord-api::kord-api
+    realtime_tools::realtime_tools
     ${control_msgs_TARGETS}
 )
 

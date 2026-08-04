@@ -15,6 +15,8 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "realtime_tools/realtime_helpers.hpp"
+
 /**
  * \file kassow_kord_hardware_interface.cpp
  * \brief Hardware interface for Kassow Kord robots using the kord-api.
@@ -228,8 +230,44 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_);
   ros_services_executor_.add_node(ros_services_node_);
   ros_services_thread_ = std::thread([this]() {
-      // set thread priorities here!
-      ros_services_executor_.spin();
+
+    // As this is inheriting high priority and SCHED_FIFO from hw interface thread,
+    // we want to lower priorities and pin service thread to NRT cores!
+    std::vector<int> target_cores = {0, 1};
+    auto affinity_result = realtime_tools::set_current_thread_affinity(target_cores);
+    
+    if (!affinity_result.first) {
+        RCLCPP_WARN(
+            ros_services_node_->get_logger(), 
+            "Failed to set thread affinity: %s", 
+            affinity_result.second.c_str()
+        );
+    } else {
+        RCLCPP_INFO(
+            ros_services_node_->get_logger(), 
+            "ROS service thread affinity successfully set to cores 0 and 1."
+        );
+    }
+
+    realtime_tools::set_current_thread_name("kassow_ros_srvs");
+
+    struct sched_param schedp;
+    std::memset(&schedp, 0, sizeof(schedp));
+    schedp.sched_priority = 0; // SCHED_OTHER
+
+    if (pthread_setschedparam(pthread_self(), SCHED_OTHER, &schedp) != 0) {
+        RCLCPP_WARN(
+            ros_services_node_->get_logger(),
+            "Failed to downgrade thread to SCHED_OTHER. Error: %s",
+            std::strerror(errno)
+        );
+    } else {
+        RCLCPP_INFO(
+            ros_services_node_->get_logger(), 
+            "ROS service thread successfully downgraded to SCHED_OTHER scheduling."
+        );
+    }
+    ros_services_executor_.spin();
   });
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");

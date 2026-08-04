@@ -24,6 +24,7 @@
   <depend>rclcpp_lifecycle</depend>
   <depend>kassow_kord_vendor</depend>
   <depend>control_msgs</depend>
+  <depend>realtime_tools</depend>
 
   <exec_depend>controller_manager</exec_depend>
 
