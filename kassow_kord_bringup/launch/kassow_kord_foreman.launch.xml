@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright (c) 2026, b»robotized Group
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Source of this file is https://github.com/b-robotized/ros_team_workspace repository.
+
+Author: Sachin
+-->
+
+<launch>
+    <arg name="description_package"
+        default="kassow_kord_bringup"
+        description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
+    <arg name="ros2_control_hardware_type"
+         default="mock"
+         description="Hardware type: mock, real, or isaac."/>
+
+    <let name="cm_name" value="b_controlled_box_cm"/>
+    <let name="foreman_config_path" value="$(find-pkg-share $(var description_package))/config/foreman_$(var ros2_control_hardware_type)_config.yaml"/>
+
+    <node name="foreman" pkg="foreman" exec="foreman_node" output="screen">
+      <param name="config_path" value="$(var foreman_config_path)"/>
+      <remap from="/controller_manager/activity" to="/$(var cm_name)/activity"/>
+      <remap from="/controller_manager/switch_controller" to="/$(var cm_name)/switch_controller"/>
+      <remap from="/controller_manager/set_hardware_component_state" to="/$(var cm_name)/set_hardware_component_state"/>
+      <remap from="/controller_manager/list_controllers" to="/$(var cm_name)/list_controllers"/>
+      <remap from="/controller_manager/list_hardware_components" to="/$(var cm_name)/list_hardware_components"/>
+      <remap from="/controller_manager/configure_controller" to="/$(var cm_name)/configure_controller"/>
+      <remap from="/controller_manager/activate_controller" to="/$(var cm_name)/activate_controller"/>
+      <remap from="/controller_manager/deactivate_controller" to="/$(var cm_name)/deactivate_controller"/>
+    </node>
+</launch>
