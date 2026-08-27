@@ -8,10 +8,10 @@
         - default_planning_request_adapters/ValidateWorkspaceBounds
         - default_planning_request_adapters/CheckStartStateBounds
         - default_planning_request_adapters/CheckStartStateCollision
-        - cubic_spline_smoothing_adapter/CubicSplineSmoothingAdapter
       response_adapters:
         - default_planning_response_adapters/ValidateSolution
         - default_planning_response_adapters/DisplayMotionPath
+        - b_robotized_moveit_plugins/CubicSplineSmoothingAdapter
 
       capabilities: >-
         pilz_industrial_motion_planner/MoveGroupSequenceAction
