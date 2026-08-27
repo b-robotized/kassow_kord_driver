@@ -14,6 +14,8 @@
 
   <exec_depend>controller_manager</exec_depend>
 
+  <exec_depend>cubic_spline_smoothing_adapter</exec_depend>
+
   <exec_depend>forward_command_controller</exec_depend>
 
   <exec_depend>joint_state_broadcaster</exec_depend>
