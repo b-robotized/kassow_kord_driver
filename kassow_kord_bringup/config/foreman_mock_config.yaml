@@ -15,7 +15,7 @@ controllers:
   joint_state_broadcaster:
     requires: [kassow, active]
 
-goal_states:
+profiles:
 
   inactive:
     controllers:
