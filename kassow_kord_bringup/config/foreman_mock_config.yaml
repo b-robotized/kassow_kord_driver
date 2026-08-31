@@ -1,0 +1,39 @@
+# Example command to transition states:
+#
+# ros2 service call /foreman/set_goal foreman_msgs/srv/SetGoal "{goal: 'idle'}"
+#
+controller_manager: b_controlled_box_cm
+
+transition_pause: 0.5
+
+hardware:
+  - kassow
+
+controllers:
+  kassow_joint_trajectory_controller:
+    requires: [kassow, active]
+  joint_state_broadcaster:
+    requires: [kassow, active]
+
+profiles:
+
+  inactive:
+    controllers:
+      kassow_joint_trajectory_controller: inactive
+      joint_state_broadcaster: inactive
+    hardware:
+      kassow: inactive
+
+  active:
+    controllers:
+      kassow_joint_trajectory_controller: active
+      joint_state_broadcaster: active
+    hardware:
+      kassow: active
+
+  unconfigured:
+    controllers:
+      kassow_joint_trajectory_controller: unconfigured
+      joint_state_broadcaster: unconfigured
+    hardware:
+      kassow: unconfigured
