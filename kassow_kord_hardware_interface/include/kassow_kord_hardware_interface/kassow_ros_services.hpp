@@ -3,22 +3,31 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <control_msgs/srv/set_payload.hpp>
+#include <control_msgs/srv/get_payload.hpp>
 #include "kord_services.hpp"
 #include <thread>
 #include <chrono>
+#include <variant>
 
 namespace kassow_kord_hardware_interface {
 
 class KassowRosServices {
 public:
-    KassowRosServices(rclcpp::Node::SharedPtr node) 
-    : node_(node){
+    KassowRosServices(rclcpp::Node::SharedPtr node, kr2::kord::ReceiverInterface* rcv_iface) 
+    : node_(node), rcv_iface_(rcv_iface){
         // allow concurrent service calls, but in each specific service we guard against concurrent calls of the same service
         reentrant_callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
         ros_server_set_load_ = node_->create_service<control_msgs::srv::SetPayload>(
             "~/set_payload",
             std::bind(&KassowRosServices::RosServiceCallback_SetPayload, this, std::placeholders::_1, std::placeholders::_2),
+            rclcpp::ServicesQoS(),
+            reentrant_callback_group_
+        );
+
+        ros_server_get_load_ = node_->create_service<control_msgs::srv::GetPayload>(
+            "~/get_payload",
+            std::bind(&KassowRosServices::RosServiceCallback_GetPayload, this, std::placeholders::_1, std::placeholders::_2),
             rclcpp::ServicesQoS(),
             reentrant_callback_group_
         );
@@ -43,8 +52,11 @@ private:
     rclcpp::CallbackGroup::SharedPtr reentrant_callback_group_;
     KordServices kord_services_;
 
+    // TODO: ? pass cmd interface and more during init, for all KORD services to use?
+    kr2::kord::ReceiverInterface* rcv_iface_;
 
     rclcpp::Service<control_msgs::srv::SetPayload>::SharedPtr ros_server_set_load_;
+    rclcpp::Service<control_msgs::srv::GetPayload>::SharedPtr ros_server_get_load_;
 
     void RosServiceCallback_SetPayload(
         const std::shared_ptr<control_msgs::srv::SetPayload::Request> req,
@@ -103,6 +115,43 @@ private:
         
         // reset for new request
         kord_services_.set_load.reset();
+    }
+
+    void RosServiceCallback_GetPayload(
+        const std::shared_ptr<control_msgs::srv::GetPayload::Request> req,
+        std::shared_ptr<control_msgs::srv::GetPayload::Response> res) 
+    {
+        auto load_id = static_cast<kr2::kord::ELoadID>(req->load_type);
+
+        //  mass
+        auto mass_data = rcv_iface_->getLoad(load_id, kr2::kord::MASS_VAL);
+        if (mass_data.empty()) {
+            RCLCPP_WARN(node_->get_logger(), "Failed to get payload: Invalid Load ID.");
+            res->success = false;
+            return;
+        }
+        res->mass = static_cast<float>(std::get<double>(mass_data[0]));
+
+        // CoG
+        auto cog_data = rcv_iface_->getLoad(load_id, kr2::kord::COG_VAL);
+        if (cog_data.size() >= 3) {
+            res->center_of_gravity.x = std::get<double>(cog_data[0]);
+            res->center_of_gravity.y = std::get<double>(cog_data[1]);
+            res->center_of_gravity.z = std::get<double>(cog_data[2]);
+        }
+
+        // interia
+        auto inertia_data = rcv_iface_->getLoad(load_id, kr2::kord::INERTIA_VAL);
+        if (inertia_data.size() >= 6) {
+            res->ixx = std::get<double>(inertia_data[0]);
+            res->iyy = std::get<double>(inertia_data[1]);
+            res->izz = std::get<double>(inertia_data[2]);
+            res->ixy = std::get<double>(inertia_data[3]);
+            res->ixz = std::get<double>(inertia_data[4]);
+            res->iyz = std::get<double>(inertia_data[5]);
+        }
+
+        res->success = true;
     }
 };
 

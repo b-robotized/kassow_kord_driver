@@ -246,7 +246,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
 
   // async services
   ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name);
-  ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_);
+  ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_, rcv_iface_.get());
   ros_services_executor_.add_node(ros_services_node_);
   ros_services_thread_ = std::thread([this]() {
 
