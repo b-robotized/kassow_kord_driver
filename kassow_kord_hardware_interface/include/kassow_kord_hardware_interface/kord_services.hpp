@@ -44,6 +44,7 @@ public:
 class KordServiceSetLoad : public KordServiceInterface {
 private:
     int64_t token_ = -1;
+    alignas(64) std::atomic<int8_t> status_{-1};
     kr2::kord::ELoadID load_id_ = kr2::kord::ELoadID::LOAD1;
     double mass_ = 0.0;
     std::array<double, 3> cog_ = {0.0, 0.0, 0.0};
@@ -68,6 +69,7 @@ public:
 
     // NRT
     void request() { 
+        status_.store(-1, std::memory_order_release);
         state_.store(KordServiceState::REQUESTED, std::memory_order_release); 
     }
 
@@ -89,6 +91,7 @@ public:
             }
             return;
         }
+        status_.store(status, std::memory_order_release);
         state_.store(KordServiceState::SUCCESS, std::memory_order_release);
         // we don't know what code the failure is. Examples just check for -1, meaning it is processing
         // there are some here:

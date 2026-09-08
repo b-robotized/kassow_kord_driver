@@ -339,7 +339,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   if (ros_services_) {
-      ros_services_->abortActiveServices();
+    RCLCPP_INFO(get_logger(), "Deactivating hardware. Pending SetPayload service state: %d", 
+                static_cast<int>(ros_services_->get_kord_services().set_load.get_state()));
+    ros_services_->abortActiveServices();
   }
 
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
