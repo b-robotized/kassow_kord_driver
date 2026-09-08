@@ -51,7 +51,9 @@ private:
     std::array<double, 6> inertia_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     
     
-public:    
+public:
+    int8_t get_status(){ return status_.load(std::memory_order_acquire); };
+        
     // NRT
     void populate(kr2::kord::ELoadID load_type, 
                   double mass, 

@@ -76,13 +76,15 @@ private:
             KordServiceState current_state = kord_services_.set_load.get_state();
             
             if (current_state == KordServiceState::SUCCESS) {
-                int8_t raw_status = kord_services_.set_load.status_.load(std::memory_order_acquire);
-                RCLCPP_INFO(node_->get_logger(), "Set Payload successful. KORD service status response: %d", raw_status);
+                RCLCPP_INFO(
+                    node_->get_logger(), "Set Payload successful. KORD service status response: %d", 
+                    kord_services_.set_load.get_status());
                 res->success = true;
                 break;
             } else if (current_state == KordServiceState::FAILURE) {
-                int8_t raw_status = kord_services_.set_load.status_.load(std::memory_order_acquire);
-                RCLCPP_ERROR(node_->get_logger(), "Set Payload command failed at the Kassow controller. KORD service status response: %d", raw_status);
+                RCLCPP_ERROR(
+                    node_->get_logger(), "Set Payload command failed at the Kassow controller. KORD service status response: %d", 
+                    kord_services_.set_load.get_status());
                 res->success = false;
                 break;
             } else if (current_state == KordServiceState::TIMEOUT) {

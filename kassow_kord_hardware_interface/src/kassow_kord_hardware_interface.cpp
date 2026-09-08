@@ -189,7 +189,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
 
 // This is heavy for RT error, but it is called from async hw interface
 // so it should not matter if we block coming from read()
-hardware_interface::CallbackReturn on_error(
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
   kord_->disconnect();
