@@ -187,6 +187,25 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+// This is heavy for RT error, but it is called from async hw interface
+// so it should not matter if we block coming from read()
+hardware_interface::CallbackReturn on_error(
+    const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  kord_->disconnect();
+
+  if (ros_services_executor_.is_spinning()) {
+      ros_services_executor_.cancel();
+  }
+  if (ros_services_thread_.joinable()) {
+      ros_services_thread_.join();
+  }
+  ros_services_.reset();
+  ros_services_node_.reset();
+
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
