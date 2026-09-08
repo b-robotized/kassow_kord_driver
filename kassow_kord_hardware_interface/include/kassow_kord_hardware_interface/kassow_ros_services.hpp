@@ -19,7 +19,7 @@ public:
         ros_server_set_load_ = node_->create_service<control_msgs::srv::SetPayload>(
             "~/set_payload",
             std::bind(&KassowRosServices::RosServiceCallback_SetPayload, this, std::placeholders::_1, std::placeholders::_2),
-            rmw_qos_profile_services_default,
+            rclcpp::ServicesQoS(),
             reentrant_callback_group_
         );
     }
