@@ -232,6 +232,32 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
+
+  if (ros_services_) {
+      ros_services_->abortActiveServices();
+  }
+
+  if (ros_services_executor_.is_spinning()) {
+      ros_services_executor_.cancel();
+  }
+  if (ros_services_thread_.joinable()) {
+      ros_services_thread_.join();
+  }
+  
+  ros_services_.reset();
+  ros_services_node_.reset();
+
+  if (kord_) {
+      kord_->disconnect();
+  }
+
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
