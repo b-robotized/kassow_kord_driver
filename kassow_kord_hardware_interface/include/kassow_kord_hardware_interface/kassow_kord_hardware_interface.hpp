@@ -62,7 +62,7 @@ public:
 
   hardware_interface::CallbackReturn on_error(
     const rclcpp_lifecycle::State & previous_state) override;
-    
+
   hardware_interface::CallbackReturn on_shutdown(
     const rclcpp_lifecycle::State & previous_state) override;
 
@@ -101,6 +101,7 @@ public:
 
 private:
   bool clean_alarms();
+  void teardown_communication();
 
   std::shared_ptr<kr2::kord::KordCore> kord_;
   std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;

@@ -187,56 +187,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-// This is heavy for RT error, but it is called from async hw interface
-// so it should not matter if we block coming from read()
-hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
-    const rclcpp_lifecycle::State & /*previous_state*/)
+
+void KassowKordHardwareInterface::teardown_communication()
 {
-  kord_->disconnect();
-
-  if (ros_services_executor_.is_spinning()) {
-      ros_services_executor_.cancel();
-  }
-  if (ros_services_thread_.joinable()) {
-      ros_services_thread_.join();
-  }
-  ros_services_.reset();
-  ros_services_node_.reset();
-
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
-
-hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
-  const rclcpp_lifecycle::State & /*previous_state*/)
-{
-  RCLCPP_INFO(get_logger(), "cleanup KassowKordHardwareInterface...");
-
-  if (!clean_alarms())
-  {
-    RCLCPP_DEBUG(
-      get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
-  }
-
-  if (ros_services_executor_.is_spinning()) {
-      ros_services_executor_.cancel();
-  }
-  if (ros_services_thread_.joinable()) {
-      ros_services_thread_.join();
-  }
-  ros_services_.reset();
-  ros_services_node_.reset();
-
-  kord_->disconnect();
-
-  RCLCPP_INFO(get_logger(), "Successfully cleaned up");
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
-
-hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
-  const rclcpp_lifecycle::State & /*previous_state*/)
-{
-  RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
-
   if (ros_services_) {
       ros_services_->abortActiveServices();
   }
@@ -254,7 +207,38 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
   if (kord_) {
       kord_->disconnect();
   }
+}
 
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
+    const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  // This is heavy for RT error, but it is called from async hw interface
+  // so it should not matter if we block coming from read()
+  teardown_communication();
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "Cleaning up KassowKordHardwareInterface...");
+
+  if (!clean_alarms()) {
+    RCLCPP_DEBUG(get_logger(), "clean_alarms() returned false during cleanup");
+  }
+
+  teardown_communication();
+
+  RCLCPP_INFO(get_logger(), "Successfully cleaned up");
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
+  teardown_communication();
+  RCLCPP_INFO(get_logger(), "Successfully shut down!");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
