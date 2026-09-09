@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <variant>
+#include <optional>
 
 namespace kassow_kord_hardware_interface {
 
@@ -35,6 +36,23 @@ public:
 
     inline const KordServices& get_kord_services() const {
         return kord_services_;
+    }
+
+    std::optional<kr2::kord::ELoadID> get_kord_load_id(uint8_t ros_load_type) {
+        using SetPayloadRequest = control_msgs::srv::SetPayload::Request;
+        switch(ros_load_type) {
+            case SetPayloadRequest::LOAD_TYPE_END_EFFECTOR:
+                return kr2::kord::ELoadID::LOAD1;
+            case SetPayloadRequest::LOAD_TYPE_PAYLOAD:
+                return kr2::kord::ELoadID::LOAD2;
+            default:
+                RCLCPP_ERROR(node_->get_logger(), 
+                        "No KORD Load ID for ROS load_type: %d. Available ROS Load Types: END_EFFECTOR=%d, PAYLOAD=%d.", 
+                        ros_load_type, 
+                        SetPayloadRequest::LOAD_TYPE_END_EFFECTOR, 
+                        SetPayloadRequest::LOAD_TYPE_PAYLOAD);
+            return std::nullopt;
+        }
     }
 
     // called on deactivation
@@ -75,8 +93,14 @@ private:
         // TODO: get this update rate from hw interface
         size_t timeout_ticks = static_cast<size_t>(timeout_sec * 500.0);
 
+        std::optional<kr2::kord::ELoadID> kord_load_id = get_kord_load_id(req->load_type);
+        if (!kord_load_id) {
+            res->success = false;
+            return;
+        }
+
         kord_services_.set_load.populate(
-            static_cast<kr2::kord::ELoadID>(req->load_type), 
+            kord_load_id.value(), 
             static_cast<double>(req->mass), 
             cog, 
             inertia, 
@@ -121,10 +145,14 @@ private:
         const std::shared_ptr<control_msgs::srv::GetPayload::Request> req,
         std::shared_ptr<control_msgs::srv::GetPayload::Response> res) 
     {
-        auto load_id = static_cast<kr2::kord::ELoadID>(req->load_type);
+        std::optional<kr2::kord::ELoadID> kord_load_id = get_kord_load_id(req->load_type);
+        if (!kord_load_id) {
+            res->success = false;
+            return;
+        }
 
         //  mass
-        auto mass_data = rcv_iface_->getLoad(load_id, kr2::kord::MASS_VAL);
+        auto mass_data = rcv_iface_->getLoad(kord_load_id.value(), kr2::kord::MASS_VAL);
         if (mass_data.empty()) {
             RCLCPP_WARN(node_->get_logger(), "Failed to get payload: Invalid Load ID.");
             res->success = false;
@@ -133,7 +161,7 @@ private:
         res->mass = static_cast<float>(std::get<double>(mass_data[0]));
 
         // CoG
-        auto cog_data = rcv_iface_->getLoad(load_id, kr2::kord::COG_VAL);
+        auto cog_data = rcv_iface_->getLoad(kord_load_id.value(), kr2::kord::COG_VAL);
         if (cog_data.size() >= 3) {
             res->center_of_gravity.x = std::get<double>(cog_data[0]);
             res->center_of_gravity.y = std::get<double>(cog_data[1]);
@@ -141,7 +169,7 @@ private:
         }
 
         // interia
-        auto inertia_data = rcv_iface_->getLoad(load_id, kr2::kord::INERTIA_VAL);
+        auto inertia_data = rcv_iface_->getLoad(kord_load_id.value(), kr2::kord::INERTIA_VAL);
         if (inertia_data.size() >= 6) {
             res->ixx = std::get<double>(inertia_data[0]);
             res->iyy = std::get<double>(inertia_data[1]);
