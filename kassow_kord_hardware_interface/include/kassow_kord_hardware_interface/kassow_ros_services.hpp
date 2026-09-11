@@ -112,6 +112,7 @@ private:
             KordServiceState current_state = kord_services_.set_load.get_state();
             
             if (current_state == KordServiceState::SUCCESS) {
+                RCLCPP_INFO(node_->get_logger(), "Motion flags AFTER completion: %u", rcv_iface_->getMotionFlags());
                 RCLCPP_INFO(
                     node_->get_logger(), "Set Payload successful. KORD service status response: %d", 
                     kord_services_.set_load.get_status());

@@ -126,6 +126,8 @@ private:
   int port;
   int waitSync_timeout_ms;
 
+  unsigned int previous_motion_flags_{0};
+
   // Async services:
   std::unique_ptr<KassowRosServices> ros_services_;
   rclcpp::Node::SharedPtr ros_services_node_;

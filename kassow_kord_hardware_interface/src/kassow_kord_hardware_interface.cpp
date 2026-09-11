@@ -396,8 +396,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
       for (auto* service : kord_services) {
           KordServiceState state = service->get_state();
           if (state == KordServiceState::REQUESTED) {
+              RCLCPP_INFO(get_logger(), "Motion flags BEFORE dispatch: %u", rcv_iface_->getMotionFlags());
               service->dispatch(*ctl_iface_);
           } else if (state == KordServiceState::DISPATCHED) {
+              RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "Motion flags DURING poll: %u", rcv_iface_->getMotionFlags());
               service->poll(*rcv_iface_);
           }
       }
@@ -409,6 +411,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  unsigned int current_motion_flags = rcv_iface_->getMotionFlags();
+  if (current_motion_flags != previous_motion_flags_)
+  {
+    RCLCPP_INFO(get_logger(), "Motion flags changed: %u -> %u", previous_motion_flags_, current_motion_flags);
+    previous_motion_flags_ = current_motion_flags;
+  }
+  
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
