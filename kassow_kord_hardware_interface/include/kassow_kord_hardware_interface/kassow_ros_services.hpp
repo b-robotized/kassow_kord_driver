@@ -131,8 +131,19 @@ private:
                 RCLCPP_WARN(node_->get_logger(), "Set Payload command was executing but was aborted due to hardware deactivation.");
                 res->success = false;
                 break;
+            } else if (current_state == KordServiceState::DISPATCHED || 
+                       current_state == KordServiceState::REQUESTED) {
+                // Do nothing. command is processing.
+            } else if (current_state == KordServiceState::IDLE) {
+                RCLCPP_WARN(node_->get_logger(), "Set Payload state unexpectedly reset to IDLE during wait.");
+                res->success = false;
+                break;
             }
-
+            else {
+                RCLCPP_WARN(node_->get_logger(), "Set Payload unexpected state! This should not happen!");
+                res->success = false;
+                break;
+            }
             // Sleep briefly to yield the CPU
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
