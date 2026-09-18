@@ -28,6 +28,18 @@
  */
 namespace kassow_kord_hardware_interface
 {
+
+bool KassowKordHardwareInterface::is_robot_stationary() const
+{
+  const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise
+  for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
+    if (std::abs(velocity_states[i]) > VELOCITY_THRESHOLD) {
+      return false;
+    }
+  }
+  return true;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 {
@@ -396,7 +408,12 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
       for (auto* service : kord_services) {
           KordServiceState state = service->get_state();
           if (state == KordServiceState::REQUESTED) {
-              service->dispatch(*ctl_iface_);
+              if (is_robot_stationary()) {
+                  service->dispatch(*ctl_iface_);
+              } else {
+                  RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Service requested but robot is not stationary. Waiting for robot to stop...");
+                  // TODO: maybe here we want to fail the service right away?
+              }
           } else if (state == KordServiceState::DISPATCHED) {
               service->poll(*rcv_iface_);
           }
@@ -416,10 +433,21 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
 
-  if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
-    return hardware_interface::return_type::ERROR;
+  bool skip_directjcontrol = false;
+  if (ros_services_) {
+    if (ros_services_->get_kord_services().set_load.get_state() == KordServiceState::DISPATCHED) {
+      skip_directjcontrol = true;
+    }
+  }
+
+  if (skip_directjcontrol) {
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, 
+      "Skipped directJControl this cycle because setLoad is currently DISPATCHED.");
+  } else {
+    if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds)) {
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
+      return hardware_interface::return_type::ERROR;
+    }
   }
 
   return hardware_interface::return_type::OK;
