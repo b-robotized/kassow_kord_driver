@@ -102,7 +102,8 @@ public:
 private:
   bool clean_alarms();
   void teardown_communication();
-  bool is_robot_stationary() const;
+  //bool is_robot_stationary() const;
+  double get_max_joint_velocity() const;
   std::string motion_flags_to_string(unsigned int flags) const;
 
   std::shared_ptr<kr2::kord::KordCore> kord_;
@@ -134,7 +135,7 @@ private:
   std::thread ros_services_thread_;
   // IMPORTANT: when we add other services, we are assuming KORD-API can take multiple concurrent services
   // if not, we gotta lock mutex to ensure only one gets called at a time.
-  rclcpp::executors::MultiThreadedExecutor ros_services_executor_;
+  std::unique_ptr<rclcpp::executors::MultiThreadedExecutor> ros_services_executor_;
 };
 
 }  // namespace kassow_kord_hardware_interface

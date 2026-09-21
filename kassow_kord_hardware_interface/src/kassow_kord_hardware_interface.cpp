@@ -49,15 +49,27 @@ std::string KassowKordHardwareInterface::motion_flags_to_string(unsigned int fla
   return s.empty() ? "NONE" : s;
 }
 
-bool KassowKordHardwareInterface::is_robot_stationary() const
+// bool KassowKordHardwareInterface::is_robot_stationary() const
+// {
+//   const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise
+//   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
+//     if (std::abs(velocity_states[i]) > VELOCITY_THRESHOLD) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
+
+double KassowKordHardwareInterface::get_max_joint_velocity() const
 {
-  const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise
+  double max_vel = 0.0;
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
-    if (std::abs(velocity_states[i]) > VELOCITY_THRESHOLD) {
-      return false;
+    double v = std::abs(velocity_states[i]);
+    if (v > max_vel) {
+      max_vel = v;
     }
   }
-  return true;
+  return max_vel;
 }
 
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
@@ -225,10 +237,8 @@ void KassowKordHardwareInterface::teardown_communication()
   if (ros_services_) {
       ros_services_->abortActiveServices();
   }
+  ros_services_executor_->cancel();
 
-  if (ros_services_executor_.is_spinning()) {
-      ros_services_executor_.cancel();
-  }
   if (ros_services_thread_.joinable()) {
       ros_services_thread_.join();
   }
@@ -287,9 +297,11 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   }
 
   // async services
-  ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name);
+  ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name + "_services");
   ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_, rcv_iface_.get());
-  ros_services_executor_.add_node(ros_services_node_);
+
+  ros_services_executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
+  ros_services_executor_->add_node(ros_services_node_);
   ros_services_thread_ = std::thread([this]() {
 
     // As this is inheriting high priority and SCHED_FIFO from hw interface thread,
@@ -328,7 +340,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
             "ROS service thread successfully downgraded to SCHED_OTHER scheduling."
         );
     }
-    ros_services_executor_.spin();
+    ros_services_executor_->spin();
   });
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
@@ -428,11 +440,28 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
       for (auto* service : kord_services) {
           KordServiceState state = service->get_state();
           if (state == KordServiceState::REQUESTED) {
-              if (is_robot_stationary()) {
+              unsigned int flags = rcv_iface_->getMotionFlags();
+              std::string flag_names = motion_flags_to_string(flags);
+              bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
+              
+              double max_v = get_max_joint_velocity();
+              const double VELOCITY_THRESHOLD = 1e-4; // adjust this
+              bool is_stationary = (max_v <= VELOCITY_THRESHOLD);
+              RCLCPP_INFO(get_logger(), 
+                          "VALIDATION [REQUESTED]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
+              
+                    // TODO: FIx: There is a race condition where the robot is moving, but  we still skip DirectJControl
+                    // because the service is requested. Fix this before the final version, this is just for testing.
+              if (is_stationary) {
+                  RCLCPP_INFO(get_logger(), 
+                          "VALIDATION [DISPATCHING - calling setLoad!]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
                   service->dispatch(*ctl_iface_);
               } else {
-                  RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Service requested but robot is not stationary. Waiting for robot to stop...");
-                  // TODO: maybe here we want to fail the service right away?
+                  RCLCPP_INFO(get_logger(),
+                      "VALIDATION: Waiting to dispatch. max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
               }
           } else if (state == KordServiceState::DISPATCHED) {
               service->poll(*rcv_iface_);
@@ -453,23 +482,22 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
 
-  bool skip_directjcontrol = false;
+  bool skip_jcontrol = false;
   if (ros_services_) {
-    if (ros_services_->get_kord_services().set_load.get_state() == KordServiceState::DISPATCHED) {
-      skip_directjcontrol = true;
+    KordServiceState srv_state = ros_services_->get_kord_services().set_load.get_state();
+    if (srv_state == KordServiceState::REQUESTED || srv_state == KordServiceState::DISPATCHED) {
+      skip_jcontrol = true;
     }
   }
 
-  if (skip_directjcontrol) {
-    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, 
-      "Skipped directJControl this cycle because setLoad is currently DISPATCHED.");
+  if (skip_jcontrol) {
+    RCLCPP_INFO(get_logger(), "VALIDATION: Skipping directJControl this cycle.");
   } else {
     if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds)) {
       RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
       return hardware_interface::return_type::ERROR;
     }
   }
-
   return hardware_interface::return_type::OK;
 }
 
