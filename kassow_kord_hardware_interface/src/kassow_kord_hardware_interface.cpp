@@ -29,6 +29,26 @@
 namespace kassow_kord_hardware_interface
 {
 
+std::string KassowKordHardwareInterface::motion_flags_to_string(unsigned int flags) const
+{
+  std::string s = "";
+  if (flags & MOTION_FLAG_STANDBY) s += "STANDBY ";
+  if (flags & MOTION_FLAG_TRACKING) s += "TRACKING ";
+  if (flags & MOTION_FLAG_TERMINATED) s += "TERMINATED ";
+  if (flags & MOTION_FLAG_HALT) s += "HALT ";
+  if (flags & MOTION_FLAG_SYNC) s += "SYNC ";
+  if (flags & MOTION_FLAG_SUSPENDED) s += "SUSPENDED ";
+  if (flags & MOTION_FLAG_OFFLINE) s += "OFFLINE ";
+  if (flags & MOTION_FLAG_INIT) s += "INIT ";
+  if (flags & MOTION_FLAG_REINIT) s += "REINIT ";
+  if (flags & MOTION_FLAG_BACKDRIVE) s += "BACKDRIVE ";
+  if (flags & MOTION_FLAG_PAUSED) s += "PAUSED ";
+  if (flags & MOTION_FLAG_MAINTENANCE) s += "MAINTENANCE ";
+  if (flags & MOTION_FLAG_VELOCITYCTL) s += "VELOCITYCTL ";
+  if (flags & MOTION_FLAG_ARTOACTIVE) s += "ARTOACTIVE ";
+  return s.empty() ? "NONE" : s;
+}
+
 bool KassowKordHardwareInterface::is_robot_stationary() const
 {
   const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise

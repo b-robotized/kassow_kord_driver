@@ -103,6 +103,7 @@ private:
   bool clean_alarms();
   void teardown_communication();
   bool is_robot_stationary() const;
+  std::string motion_flags_to_string(unsigned int flags) const;
 
   std::shared_ptr<kr2::kord::KordCore> kord_;
   std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
