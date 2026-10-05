@@ -136,6 +136,10 @@ private:
   // IMPORTANT: when we add other services, we are assuming KORD-API can take multiple concurrent services
   // if not, we gotta lock mutex to ensure only one gets called at a time.
   std::unique_ptr<rclcpp::executors::MultiThreadedExecutor> ros_services_executor_;
+
+  // Testing, to be removed:
+  unsigned int motion_flags_prev_ = 0xFFFFFFFF;
+  bool skip_jcontrol_ = false;
 };
 
 }  // namespace kassow_kord_hardware_interface

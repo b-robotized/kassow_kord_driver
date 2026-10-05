@@ -367,6 +367,17 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial joint positions and set them as the initial command values
   rcv_iface_->fetchData();
+  
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_) {
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", 
+      motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str()
+    );
+    motion_flags_prev_ = motion_flags_curr;
+  }
+
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
@@ -420,6 +431,16 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     return hardware_interface::return_type::ERROR;
   }
 
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_) {
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", 
+      motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str()
+    );
+    motion_flags_prev_ = motion_flags_curr;
+  }
+
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
@@ -433,7 +454,8 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
-
+  
+  skip_jcontrol_ = false;
   if (ros_services_) {
       const auto& kord_services = ros_services_->get_kord_services().as_array();
       
@@ -443,6 +465,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
               unsigned int flags = rcv_iface_->getMotionFlags();
               std::string flag_names = motion_flags_to_string(flags);
               bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
+              bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
               
               double max_v = get_max_joint_velocity();
               const double VELOCITY_THRESHOLD = 1e-4; // adjust this
@@ -451,24 +474,28 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
                           "VALIDATION [REQUESTED]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
                           max_v, is_stationary, is_standby, flags, flag_names.c_str());
               
-                    // TODO: FIx: There is a race condition where the robot is moving, but  we still skip DirectJControl
-                    // because the service is requested. Fix this before the final version, this is just for testing.
-              if (is_stationary) {
+              if (!is_stationary) {
+                  RCLCPP_WARN(get_logger(), "VALIDATION: Robot is moving. Rejecting async service request.");
+                  service->abort();
+              } else if (is_standby || is_init) {
+                  skip_jcontrol_ = true;
                   RCLCPP_INFO(get_logger(), 
                           "VALIDATION [DISPATCHING - calling setLoad!]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
                           max_v, is_stationary, is_standby, flags, flag_names.c_str());
                   service->dispatch(*ctl_iface_);
               } else {
-                  RCLCPP_INFO(get_logger(),
+                  skip_jcontrol_ = true;
+                  RCLCPP_INFO_THROTTLE(get_logger(),  *get_clock(), 500,
                       "VALIDATION: Waiting to dispatch. max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
                           max_v, is_stationary, is_standby, flags, flag_names.c_str());
               }
           } else if (state == KordServiceState::DISPATCHED) {
+              // dispatched but not finished, keep skipping.
+              skip_jcontrol_ = true;
               service->poll(*rcv_iface_);
           }
       }
   }
-
   return hardware_interface::return_type::OK;
 }
 
@@ -482,16 +509,8 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
 
-  bool skip_jcontrol = false;
-  if (ros_services_) {
-    KordServiceState srv_state = ros_services_->get_kord_services().set_load.get_state();
-    if (srv_state == KordServiceState::REQUESTED || srv_state == KordServiceState::DISPATCHED) {
-      skip_jcontrol = true;
-    }
-  }
-
-  if (skip_jcontrol) {
-    RCLCPP_INFO(get_logger(), "VALIDATION: Skipping directJControl this cycle.");
+  if (skip_jcontrol_) {
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "VALIDATION: Skipping directJControl this cycle.");
   } else {
     if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds)) {
       RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
