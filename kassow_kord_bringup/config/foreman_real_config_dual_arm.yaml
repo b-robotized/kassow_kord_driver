@@ -1,0 +1,37 @@
+# Example command to transition states:
+# ros2 service call /foreman/set_profile foreman_msgs/srv/SetProfile "{profile: 'idle'}"
+#
+
+controller_manager: b_controlled_box_cm
+
+hardware:
+  - kassow_left
+  - kassow_right
+
+controllers:
+  kassow_left_joint_trajectory_controller:
+    requires: [kassow_left, active]
+  kassow_right_joint_trajectory_controller:
+    requires: [kassow_right, active]
+  joint_state_broadcaster:
+    requires: [kassow, inactive]
+
+profiles:
+
+  inactive:
+    controllers:
+      kassow_left_joint_trajectory_controller: inactive
+      kassow_right_joint_trajectory_controller: inactive
+      joint_state_broadcaster: active
+    hardware:
+      kassow_left: inactive
+      kassow_right: inactive
+
+  active:
+    controllers:
+      kassow_left_joint_trajectory_controller: active
+      kassow_right_joint_trajectory_controller: active
+      joint_state_broadcaster: active
+    hardware:
+      kassow_left: inactive
+      kassow_right: inactive

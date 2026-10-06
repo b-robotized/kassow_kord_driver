@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="kassow_kord" xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro name="kassow_kord_srdf" params="prefix tip_link='end_effector'">
+
+    <group name="${prefix}_manipulator">
+        <chain base_link="${prefix}_base" tip_link="${prefix}_${tip_link}"/>
+    </group>
+
+    <disable_collisions link1="${prefix}_base" link2="${prefix}_link2" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link2" link2="${prefix}_linkJ3" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_linkJ3" link2="${prefix}_link3" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link3" link2="${prefix}_link4" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link4" link2="${prefix}_linkJ5" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_linkJ5" link2="${prefix}_link5" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link5" link2="${prefix}_link6" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link6" link2="${prefix}_linkJ7" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_linkJ7" link2="${prefix}_link7" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link7" link2="${prefix}_end_effector" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link4" link2="${prefix}_link5" reason="Adjacent" />
+    <disable_collisions link1="${prefix}_link6" link2="${prefix}_link7" reason="Adjacent" />
+
+  </xacro:macro>
+
+</robot>
