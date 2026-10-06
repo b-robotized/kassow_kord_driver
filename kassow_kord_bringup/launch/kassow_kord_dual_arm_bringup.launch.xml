@@ -57,16 +57,16 @@
     <arg name="robot_2_cpu_affinity" value="$(var robot_2_cpu_affinity)"/>
   </include>
 
-  <node pkg="controller_manager" exec="spawner" name="joint_state_broadcaster_spawner" 
-    output="screen" cwd="$(var controllers_yaml_dir)" 
+  <node pkg="controller_manager" exec="spawner" name="joint_state_broadcaster_spawner"
+    output="screen" cwd="$(var controllers_yaml_dir)"
     args="joint_state_broadcaster -c /$(var cm_name)  -p $(var controllers_yaml_file) --inactive"/>
-  <node pkg="controller_manager" exec="spawner" name="jtc_spawner" 
-    output="screen" cwd="$(var controllers_yaml_dir)" 
+  <node pkg="controller_manager" exec="spawner" name="jtc_spawner"
+    output="screen" cwd="$(var controllers_yaml_dir)"
     args="kassow_left_joint_trajectory_controller -c /$(var cm_name) -p $(var controllers_yaml_file) --inactive"/>
-  <node pkg="controller_manager" exec="spawner" name="jtc_spawner" 
-    output="screen" cwd="$(var controllers_yaml_dir)" 
+  <node pkg="controller_manager" exec="spawner" name="jtc_spawner"
+    output="screen" cwd="$(var controllers_yaml_dir)"
     args="kassow_right_joint_trajectory_controller -c /$(var cm_name) -p $(var controllers_yaml_file) --inactive"/>
-    
+
 
   <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_dual_arm_foreman.launch.xml">
     <arg name="configuration_package" value="$(var configuration_package)"/>
