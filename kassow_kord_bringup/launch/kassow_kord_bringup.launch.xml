@@ -18,25 +18,26 @@
   Author: Dr. Denis
 -->
 <launch>
-  <arg name="configuration_package" default="kassow_kord_bringup" description="The ROS package where we find the configuration files."/>
+  <let name="prefix" value=""/>
   <arg name="robot_model" default="kr810" description="The Kassow robot model to use."/>
-  <arg name="start_rviz" default="true" description="Launch RViz visualization?"/>
+  <arg name="start_rviz" default="false" description="Launch RViz visualization?"/>
   <arg name="ros2_control_hardware_type" default="real" description="Hardware type: mock or real">
       <choice value="mock"/>
       <choice value="real"/>
   </arg>
-  
-  <arg name="is_async" default="true"/>
-  <arg name="scheduling_policy" default="slave"/>
-  <arg name="thread_priority" default="70"/>
-  <arg name="cpu_affinity" default="[2,3]"/>
 
-  <let name="prefix" value=""/>
+  <arg name="configuration_package" default="kassow_kord_bringup" description="The ROS package where we find the configuration files."/>
   <let name="cm_name" value="b_controlled_box_cm"/>
   <let name="controllers_yaml_file" value="kassow_kord_controllers.yaml"/>
   <let name="controllers_yaml_dir" value="$(find-pkg-share $(var configuration_package))/config/"/>
 
-
+  <!-- ######### ROS2 CONTROL ASYNC PARAMETERS ###################### -->
+  <arg name="is_async" default="true"/>
+  <arg name="scheduling_policy" default="slave"/>
+  <arg name="thread_priority" default="70"/>
+  <arg name="cpu_affinity" default="[2,3]"/>
+  
+  <!-- ######### DESCRIPTION ###################### -->
   <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_description.launch.xml">
     <arg name="robot_model" value="$(var robot_model)"/>
     <arg name="ros2_control_hardware_type" value="$(var ros2_control_hardware_type)"/>
@@ -46,20 +47,22 @@
     <arg name="cpu_affinity" value="$(var cpu_affinity)"/>
   </include>
 
-
+  <!-- ######### CONTROLLERS ###################### -->
   <node pkg="controller_manager" exec="spawner" name="joint_state_broadcaster_spawner" 
     output="screen" cwd="$(var controllers_yaml_dir)" 
     args="joint_state_broadcaster -c /$(var cm_name)  -p $(var controllers_yaml_file) --inactive"/>
   <node pkg="controller_manager" exec="spawner" name="jtc_spawner" 
     output="screen" cwd="$(var controllers_yaml_dir)" 
     args="kassow_joint_trajectory_controller -c /$(var cm_name) -p $(var controllers_yaml_file) --inactive"/>
-
-  <node if="$(var start_rviz)" pkg="rviz2" exec="rviz2" name="rviz2" output="both" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal"/>
-
+  
+  <!-- ######### FOREMAN ###################### -->
   <include file="$(find-pkg-share $(var configuration_package))/launch/kassow_kord_foreman.launch.xml">
     <arg name="configuration_package" value="$(var configuration_package)"/>
     <arg name="ros2_control_hardware_type" value="$(var ros2_control_hardware_type)"/>
     <arg name="cm_name" value="$(var cm_name)"/>
   </include>
+  
+  <!-- ######### RVIZ ###################### -->
+  <node if="$(var start_rviz)" pkg="rviz2" exec="rviz2" name="rviz2" output="both" args="-d $(find-pkg-share $(var configuration_package))/config/kassow_kord.rviz --ros-args --log-level fatal"/>
 
 </launch>
