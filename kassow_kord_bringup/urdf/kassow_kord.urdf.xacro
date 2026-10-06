@@ -18,12 +18,12 @@
   <xacro:call macro="$(arg robot_model)_description" prefix="$(arg prefix)" parent="world">
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:call>
-  
+
   <xacro:arg name="thread_priority" default="70"/>
   <xacro:arg name="cpu_affinity" default="[2,3]"/>
   <xacro:arg name="scheduling_policy" default="slave"/>
   <xacro:arg name="is_async" default="true"/>
-  
+
   <xacro:kassow_kord_ros2_control
     name="$(arg prefix)"
     prefix="$(arg prefix)"

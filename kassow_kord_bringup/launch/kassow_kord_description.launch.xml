@@ -26,14 +26,14 @@
       <choice value="mock"/>
       <choice value="real"/>
   </arg>
-  
+
   <arg name="ip_address" default="10.23.23.206" description="IP address of the robot."/>
   <arg name="port" default="28283" description="Port of the robot."/>
   <arg name="session_id" default="1" description="Session ID of the robot."/>
 
   <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
   <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
-  
+
   <!-- Async parameters -->
   <arg name="is_async" default="true" description="Run ros2_control in async mode."/>
   <arg name="scheduling_policy" default="slave" description="Thread scheduling policy."/>
