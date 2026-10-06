@@ -44,6 +44,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_2">
@@ -54,6 +55,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_3">
@@ -64,6 +66,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_4">
@@ -74,6 +77,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_5">
@@ -84,6 +88,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_6">
@@ -94,6 +99,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <joint name="${prefix}_joint_7">
@@ -104,6 +110,7 @@
         <state_interface name="velocity"/>
         <state_interface name="acceleration"/>
         <state_interface name="effort"/>
+        <state_interface name="effort_external"/>
       </joint>
 
       <gpio name="kassow_digital_IOs">
