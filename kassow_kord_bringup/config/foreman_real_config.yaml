@@ -3,7 +3,6 @@
 #
 
 controller_manager: b_controlled_box_cm
-autostart_profile: active
 
 hardware:
   - kassow

@@ -2,8 +2,8 @@
 
 <robot name="kassow_kord" xmlns:xacro="http://wiki.ros.org/xacro">
     <xacro:arg name="prefix" default=""/>
-
-    <xacro:include filename="$(find kassow_kord_bringup)/srdf/kassow_kord_macro.srdf.xacro"/>
+    <xacro:arg name="robot_model" default="kr810"/>
+    <xacro:include filename="$(find kassow_kord_description)/$(arg robot_model)/srdf/kassow_kord_macro.srdf.xacro"/>
 
     <xacro:kassow_kord_srdf prefix="$(arg prefix)"/>
 

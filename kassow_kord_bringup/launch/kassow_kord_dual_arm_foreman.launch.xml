@@ -31,7 +31,7 @@ Author: Sachin
          description="Hardware type: mock, real, or isaac."/>
 
     <let name="cm_name" value="b_controlled_box_cm"/>
-    <let name="foreman_config_path" value="$(find-pkg-share $(var configuration_package))/config/foreman_$(var ros2_control_hardware_type)_config.yaml"/>
+    <let name="foreman_config_path" value="$(find-pkg-share $(var configuration_package))/config/foreman_$(var ros2_control_hardware_type)_config_dual_arm.yaml"/>
 
     <node name="foreman" pkg="foreman" exec="foreman_node" output="screen">
       <param name="config_path" value="$(var foreman_config_path)"/>
