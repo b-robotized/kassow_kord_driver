@@ -404,6 +404,69 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+bool KassowKordHardwareInterface::check_and_log_safety_violations()
+{
+  // 1. Fetch current status flags
+  unsigned int motion_flags = rcv_iface_->getMotionFlags();
+  unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
+  unsigned int button_flags = rcv_iface_->getButtonFlags();
+  unsigned int hw_flags     = rcv_iface_->getHWFlags();
+  uint32_t alarm_state      = rcv_iface_->systemAlarmState();
+
+  // 2. Evaluate individual triggers using the local enums
+  bool m_halt   = motion_flags & MotionFlags::MOTION_FLAG_HALT;
+  bool m_susp   = motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED;
+  bool s_estop  = safety_flags & SafetyFlags::SAFETY_FLAG_ESTOP;
+  bool s_pstop  = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
+  
+  bool b_estop  = button_flags & ButtonFlags::BUTTONS_FLAG_ESTOP;
+  bool hw_estop = hw_flags & HWFlags::HW_FLAG_IOB_ESTOP_STALL;
+
+  // Extract packed Category (bits 0-3) and Context (bits 4-7)
+  uint8_t current_cat   = alarm_state & 0x0F;
+  uint8_t current_cntxt = (alarm_state >> 4) & 0x0F;
+  
+  bool a_ctx_estop  = (current_cntxt == SystemAlarmContext::CNTXT_ESTOP);
+  bool a_cat_safety = (current_cat == SystemAlarmCategory::CAT_SAFETY_EVENT);
+
+  // 3. Trigger condition and format comprehensive log
+  if (m_halt || m_susp || s_estop || s_pstop || b_estop || hw_estop || a_ctx_estop || a_cat_safety) {
+    std::string log_msg = "Deactivating. FLags: ";
+    
+    if (m_halt || m_susp) {
+      log_msg += "Motion: ";
+      if (m_halt) log_msg += "HALT";
+      if (m_halt && m_susp) log_msg += ", ";
+      if (m_susp) log_msg += "SUSPENDED";
+      log_msg += ". ";
+    }
+    
+    if (s_estop || s_pstop) {
+      log_msg += "SafetyFlags: ";
+      if (s_estop) log_msg += "ESTOP";
+      if (s_estop && s_pstop) log_msg += ", ";
+      if (s_pstop) log_msg += "PSTOP";
+      log_msg += ". ";
+    }
+    
+    if (b_estop) log_msg += "ButtonFlags: ESTOP. ";
+    if (hw_estop) log_msg += "HWFlags: IOB_ESTOP_STALL. ";
+    
+    if (a_ctx_estop || a_cat_safety) {
+      log_msg += "SystemAlarm: ";
+      if (a_ctx_estop) log_msg += "CNTXT_ESTOP";
+      if (a_ctx_estop && a_cat_safety) log_msg += ", ";
+      if (a_cat_safety) log_msg += "CAT_SAFETY_EVENT";
+      log_msg += ". ";
+    }
+
+    RCLCPP_ERROR(get_logger(), "%s", log_msg.c_str());
+    return true; // Violation detected
+  }
+
+  return false; // No violations
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
@@ -429,12 +492,6 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   rcv_iface_->fetchData();
 
-  if (rcv_iface_->systemAlarmState())
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected, deactivating...");
-    return hardware_interface::return_type::ERROR;
-  }
-
   unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
   if (motion_flags_curr != motion_flags_prev_) {
     RCLCPP_INFO(
@@ -459,6 +516,12 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
   
+  if (rcv_iface_->systemAlarmState())
+  {
+    //RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected in read(), deactivating in write()...");
+    return hardware_interface::return_type::OK;
+  }  
+
   skip_jcontrol_ = false;
   if (ros_services_) {
       const auto& kord_services = ros_services_->get_kord_services().as_array();
@@ -506,6 +569,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  if (check_and_log_safety_violations()) {
+    return hardware_interface::return_type::DEACTIVATE;
+  }
+
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);

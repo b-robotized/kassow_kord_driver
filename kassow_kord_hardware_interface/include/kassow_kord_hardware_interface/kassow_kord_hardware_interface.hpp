@@ -99,7 +99,47 @@ public:
     SAFETY_FLAG_USER_CONF_REQ = 16
   };
 
+  enum ButtonFlags : unsigned int
+  {
+    BUTTONS_FLAG_ESTOP = 0x01,
+    BUTTONS_FLAG_PSTOP = 0x02,
+    BUTTONS_FLAG_TOGGLE = 0x04,
+    BUTTONS_FLAG_BACKDRIVE = 0x08,
+    BUTTONS_FLAG_TEACH = 0x10
+  };
+
+  enum HWFlags : unsigned int
+  {
+    HW_FLAG_RUID_MISMATCH = 0x0004,
+    HW_FLAG_HARD_FAULT = 0x0008,
+    HW_FLAG_DISCOVERY_FAILED = 0x0100,
+    HW_FLAG_ERROR_BITS_SET = 0x0200,
+    HW_FLAG_DEVICE_DISABLED = 0x0400,
+    HW_FLAG_LOW_VOLTAGE = 0x0800,
+    HW_FLAG_IOB_INIT_TIMEOUT = 0x1000,
+    HW_FLAG_SYNC_INIT_TIMEOUT = 0x2000,
+    HW_FLAG_IOB_ESTOP_STALL = 0x4000,
+    HW_FLAG_IOB_PSTOP_STALL = 0x8000
+  };
+
+  enum SystemAlarmCategory : unsigned int
+  {
+    CAT_SAFETY_EVENT = 0x01,
+    CAT_SOFT_STOP_EVENT = 0x02,
+    CAT_HW_STAT = 0x03,
+    CAT_CBUN_EVENT = 0x04
+  };
+
+  enum SystemAlarmContext : unsigned int
+  {
+    CNTXT_ESTOP = 0x01,
+    CNTXT_PSTOP = 0x02,
+    CNTXT_SSTOP = 0x04,
+    CNTXT_SYSERR = 0x08
+  };
+
 private:
+  bool check_and_log_safety_violations();
   bool clean_alarms();
   void teardown_communication();
   //bool is_robot_stationary() const;
