@@ -413,6 +413,14 @@ bool KassowKordHardwareInterface::check_and_log_safety_violations()
   unsigned int hw_flags     = rcv_iface_->getHWFlags();
   uint32_t alarm_state      = rcv_iface_->systemAlarmState();
 
+  if (ros_services_) {
+      ros_services_->shared_state_.motion_flags.store(motion_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.safety_flags.store(safety_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.button_flags.store(button_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.hw_flags.store(hw_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.alarm_state.store(alarm_state, std::memory_order_relaxed);
+  }
+
   // 2. Evaluate individual triggers using the local enums
   bool m_halt   = motion_flags & MotionFlags::MOTION_FLAG_HALT;
   bool m_susp   = motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED;

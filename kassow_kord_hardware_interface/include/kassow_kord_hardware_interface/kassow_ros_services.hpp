@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <control_msgs/srv/set_payload.hpp>
 #include <control_msgs/srv/get_payload.hpp>
+#include <std_msgs/msg/string.hpp>
 #include "kord_services.hpp"
 #include <thread>
 #include <chrono>
@@ -12,8 +13,18 @@
 
 namespace kassow_kord_hardware_interface {
 
+struct RobotSafetyState {
+    std::atomic<uint32_t> motion_flags{0};
+    std::atomic<uint32_t> safety_flags{0};
+    std::atomic<uint32_t> button_flags{0};
+    std::atomic<uint32_t> hw_flags{0};
+    std::atomic<uint32_t> alarm_state{0};
+};
+
 class KassowRosServices {
 public:
+    RobotSafetyState shared_state_;
+
     KassowRosServices(rclcpp::Node::SharedPtr node, kr2::kord::ReceiverInterface* rcv_iface) 
     : node_(node), rcv_iface_(rcv_iface){
         // allow concurrent service calls, but in each specific service we guard against concurrent calls of the same service
@@ -30,6 +41,17 @@ public:
             "~/get_payload",
             std::bind(&KassowRosServices::RosServiceCallback_GetPayload, this, std::placeholders::_1, std::placeholders::_2),
             rclcpp::ServicesQoS(),
+            reentrant_callback_group_
+        );
+
+        state_pub_ = node_->create_publisher<std_msgs::msg::String>(
+            "~/robot_state", 
+            rclcpp::QoS(1).transient_local()
+        );
+
+        state_timer_ = node_->create_wall_timer(
+            std::chrono::milliseconds(20),
+            std::bind(&KassowRosServices::publish_state_if_changed, this),
             reentrant_callback_group_
         );
     }
@@ -191,6 +213,48 @@ private:
         }
 
         res->success = true;
+    }
+
+    // TODO: refactor this
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;
+    rclcpp::TimerBase::SharedPtr state_timer_;
+
+    // Cache to track changes
+    uint32_t last_motion_ = 0xFFFFFFFF;
+    uint32_t last_safety_ = 0xFFFFFFFF;
+    uint32_t last_button_ = 0xFFFFFFFF;
+    uint32_t last_hw_     = 0xFFFFFFFF;
+    uint32_t last_alarm_  = 0xFFFFFFFF;
+
+    // 4. Timer callback to check for changes and publish JSON
+    void publish_state_if_changed() {
+        // Read lock-free atomics
+        uint32_t current_motion = shared_state_.motion_flags.load(std::memory_order_relaxed);
+        uint32_t current_safety = shared_state_.safety_flags.load(std::memory_order_relaxed);
+        uint32_t current_button = shared_state_.button_flags.load(std::memory_order_relaxed);
+        uint32_t current_hw     = shared_state_.hw_flags.load(std::memory_order_relaxed);
+        uint32_t current_alarm  = shared_state_.alarm_state.load(std::memory_order_relaxed);
+
+        if (current_motion != last_motion_ || current_safety != last_safety_ || 
+            current_button != last_button_ || current_hw != last_hw_ || current_alarm != last_alarm_) {
+            
+            // Construct JSON string
+            char json_buffer[512];
+            snprintf(json_buffer, sizeof(json_buffer),
+                "{\"motion_flags\": %u, \"safety_flags\": %u, \"button_flags\": %u, \"hw_flags\": %u, \"alarm_state\": %u}",
+                current_motion, current_safety, current_button, current_hw, current_alarm);
+
+            auto msg = std::make_unique<std_msgs::msg::String>();
+            msg->data = std::string(json_buffer);
+            state_pub_->publish(std::move(msg));
+
+            // Update cache
+            last_motion_ = current_motion;
+            last_safety_ = current_safety;
+            last_button_ = current_button;
+            last_hw_     = current_hw;
+            last_alarm_  = current_alarm;
+        }
     }
 };
 

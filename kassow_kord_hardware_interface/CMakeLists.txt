@@ -17,6 +17,7 @@ set(THIS_PACKAGE_DEPS
   kassow_kord_vendor
   control_msgs
   realtime_tools
+  std_msgs
 )
 
 # find dependencies
@@ -45,6 +46,7 @@ target_link_libraries(${PROJECT_NAME}
     kord-api::kord-api
     realtime_tools::realtime_tools
     ${control_msgs_TARGETS}
+    ${std_msgs_TARGETS}
 )
 
 # prevent pluginlib from using boost
