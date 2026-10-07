@@ -174,10 +174,10 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     }
 
     // Validate we have four state interface
-    if (joint.state_interfaces.size() != 5)
+    if (joint.state_interfaces.size() != 4)
     {
       RCLCPP_FATAL(
-        get_logger(), "Joint '%s' state interface invalid. Expected exactly five state interfaces.",
+        get_logger(), "Joint '%s' state interface invalid. Expected exactly four state interfaces.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
     }
@@ -191,22 +191,21 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
         state_interface.name == hardware_interface::HW_IF_POSITION ||
         state_interface.name == hardware_interface::HW_IF_VELOCITY ||
         state_interface.name == hardware_interface::HW_IF_ACCELERATION ||
-        state_interface.name == hardware_interface::HW_IF_EFFORT ||
-        state_interface.name == "effort_external")
+        state_interface.name == hardware_interface::HW_IF_EFFORT)
       {
-        if (++required_interfaces == 5)
+        if (++required_interfaces == 4)
         {
           break;
         }
       }
     }
 
-    if (required_interfaces != 5)
+    if (required_interfaces != 4)
     {
       RCLCPP_FATAL(
         get_logger(),
         "Joint '%s' missing required state interfaces. Expected position, velocity, acceleration, "
-        "effort and effort_external.",
+        "and effort.",
         joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
     }
@@ -216,7 +215,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_acceleration_itfs_[joint_index] =
       joint.name + "/" + hardware_interface::HW_IF_ACCELERATION;
     joint_effort_itfs_[joint_index] = joint.name + "/" + hardware_interface::HW_IF_EFFORT;
-    joint_effort_external_itfs_[joint_index] = joint.name + "/" + "effort_external";
     joint_index++;
   }
 
@@ -385,7 +383,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   acceleration_states =
     rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_ACCELERATIONS);
   torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
-  torque_states_external = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_TRQDEV_SMOOTH);
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
@@ -393,7 +390,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
-    set_state(joint_effort_external_itfs_[i], torque_states_external[i]);
 
     set_command(joint_position_itfs_[i], position_states[i]);
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
