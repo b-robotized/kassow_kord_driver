@@ -15,6 +15,8 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "realtime_tools/realtime_helpers.hpp"
+
 /**
  * \file kassow_kord_hardware_interface.cpp
  * \brief Hardware interface for Kassow Kord robots using the kord-api.
@@ -26,6 +28,50 @@
  */
 namespace kassow_kord_hardware_interface
 {
+
+std::string KassowKordHardwareInterface::motion_flags_to_string(unsigned int flags) const
+{
+  std::string s = "";
+  if (flags & MOTION_FLAG_STANDBY) s += "STANDBY ";
+  if (flags & MOTION_FLAG_TRACKING) s += "TRACKING ";
+  if (flags & MOTION_FLAG_TERMINATED) s += "TERMINATED ";
+  if (flags & MOTION_FLAG_HALT) s += "HALT ";
+  if (flags & MOTION_FLAG_SYNC) s += "SYNC ";
+  if (flags & MOTION_FLAG_SUSPENDED) s += "SUSPENDED ";
+  if (flags & MOTION_FLAG_OFFLINE) s += "OFFLINE ";
+  if (flags & MOTION_FLAG_INIT) s += "INIT ";
+  if (flags & MOTION_FLAG_REINIT) s += "REINIT ";
+  if (flags & MOTION_FLAG_BACKDRIVE) s += "BACKDRIVE ";
+  if (flags & MOTION_FLAG_PAUSED) s += "PAUSED ";
+  if (flags & MOTION_FLAG_MAINTENANCE) s += "MAINTENANCE ";
+  if (flags & MOTION_FLAG_VELOCITYCTL) s += "VELOCITYCTL ";
+  if (flags & MOTION_FLAG_ARTOACTIVE) s += "ARTOACTIVE ";
+  return s.empty() ? "NONE" : s;
+}
+
+// bool KassowKordHardwareInterface::is_robot_stationary() const
+// {
+//   const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise
+//   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
+//     if (std::abs(velocity_states[i]) > VELOCITY_THRESHOLD) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
+
+double KassowKordHardwareInterface::get_max_joint_velocity() const
+{
+  double max_vel = 0.0;
+  for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
+    double v = std::abs(velocity_states[i]);
+    if (v > max_vel) {
+      max_vel = v;
+    }
+  }
+  return max_vel;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 {
@@ -185,20 +231,56 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+
+void KassowKordHardwareInterface::teardown_communication()
+{
+  if (ros_services_) {
+      ros_services_->abortActiveServices();
+  }
+  ros_services_executor_->cancel();
+
+  if (ros_services_thread_.joinable()) {
+      ros_services_thread_.join();
+  }
+  
+  ros_services_.reset();
+  ros_services_node_.reset();
+
+  if (kord_) {
+      kord_->disconnect();
+  }
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
+    const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  // This is heavy for RT error, but it is called from async hw interface
+  // so it should not matter if we block coming from read()
+  teardown_communication();
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  RCLCPP_INFO(get_logger(), "cleanup KassowKordHardwareInterface...");
+  RCLCPP_INFO(get_logger(), "Cleaning up KassowKordHardwareInterface...");
 
-  if (!clean_alarms())
-  {
-    RCLCPP_DEBUG(
-      get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
+  if (!clean_alarms()) {
+    RCLCPP_DEBUG(get_logger(), "clean_alarms() returned false during cleanup");
   }
 
-  kord_->disconnect();
+  teardown_communication();
 
   RCLCPP_INFO(get_logger(), "Successfully cleaned up");
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
+  teardown_communication();
+  RCLCPP_INFO(get_logger(), "Successfully shut down!");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -213,6 +295,53 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot.");
     return hardware_interface::CallbackReturn::ERROR;
   }
+
+  // async services
+  ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name + "_services");
+  ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_, rcv_iface_.get());
+
+  ros_services_executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
+  ros_services_executor_->add_node(ros_services_node_);
+  ros_services_thread_ = std::thread([this]() {
+
+    // As this is inheriting high priority and SCHED_FIFO from hw interface thread,
+    // we want to lower priorities and pin service thread to NRT cores!
+    std::vector<int> target_cores = {0, 1};
+    auto affinity_result = realtime_tools::set_current_thread_affinity(target_cores);
+    
+    if (!affinity_result.first) {
+        RCLCPP_WARN(
+            ros_services_node_->get_logger(), 
+            "Failed to set thread affinity: %s", 
+            affinity_result.second.c_str()
+        );
+    } else {
+        RCLCPP_INFO(
+            ros_services_node_->get_logger(), 
+            "ROS service thread affinity successfully set to cores 0 and 1."
+        );
+    }
+
+    realtime_tools::set_current_thread_name("kassow_ros_srvs");
+
+    struct sched_param schedp;
+    std::memset(&schedp, 0, sizeof(schedp));
+    schedp.sched_priority = 0; // SCHED_OTHER
+
+    if (pthread_setschedparam(pthread_self(), SCHED_OTHER, &schedp) != 0) {
+        RCLCPP_WARN(
+            ros_services_node_->get_logger(),
+            "Failed to downgrade thread to SCHED_OTHER. Error: %s",
+            std::strerror(errno)
+        );
+    } else {
+        RCLCPP_INFO(
+            ros_services_node_->get_logger(), 
+            "ROS service thread successfully downgraded to SCHED_OTHER scheduling."
+        );
+    }
+    ros_services_executor_->spin();
+  });
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -238,6 +367,17 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial joint positions and set them as the initial command values
   rcv_iface_->fetchData();
+  
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_) {
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", 
+      motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str()
+    );
+    motion_flags_prev_ = motion_flags_curr;
+  }
+
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
@@ -260,9 +400,86 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+bool KassowKordHardwareInterface::check_and_log_safety_violations()
+{
+  // 1. Fetch current status flags
+  unsigned int motion_flags = rcv_iface_->getMotionFlags();
+  unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
+  unsigned int button_flags = rcv_iface_->getButtonFlags();
+  unsigned int hw_flags     = rcv_iface_->getHWFlags();
+  uint32_t alarm_state      = rcv_iface_->systemAlarmState();
+
+  if (ros_services_) {
+      ros_services_->shared_state_.motion_flags.store(motion_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.safety_flags.store(safety_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.button_flags.store(button_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.hw_flags.store(hw_flags, std::memory_order_relaxed);
+      ros_services_->shared_state_.alarm_state.store(alarm_state, std::memory_order_relaxed);
+  }
+
+  // 2. Evaluate individual triggers using the local enums
+  bool m_halt   = motion_flags & MotionFlags::MOTION_FLAG_HALT;
+  bool m_susp   = motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED;
+  bool s_estop  = safety_flags & SafetyFlags::SAFETY_FLAG_ESTOP;
+  bool s_pstop  = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
+  
+  bool b_estop  = button_flags & ButtonFlags::BUTTONS_FLAG_ESTOP;
+  bool hw_estop = hw_flags & HWFlags::HW_FLAG_IOB_ESTOP_STALL;
+
+  // Extract packed Category (bits 0-3) and Context (bits 4-7)
+  uint8_t current_cat   = alarm_state & 0x0F;
+  uint8_t current_cntxt = (alarm_state >> 4) & 0x0F;
+  
+  bool a_ctx_estop  = (current_cntxt == SystemAlarmContext::CNTXT_ESTOP);
+  bool a_cat_safety = (current_cat == SystemAlarmCategory::CAT_SAFETY_EVENT);
+
+  // 3. Trigger condition and format comprehensive log
+  if (m_halt || m_susp || s_estop || s_pstop || b_estop || hw_estop || a_ctx_estop || a_cat_safety) {
+    std::string log_msg = "Deactivating. FLags: ";
+    
+    if (m_halt || m_susp) {
+      log_msg += "Motion: ";
+      if (m_halt) log_msg += "HALT";
+      if (m_halt && m_susp) log_msg += ", ";
+      if (m_susp) log_msg += "SUSPENDED";
+      log_msg += ". ";
+    }
+    
+    if (s_estop || s_pstop) {
+      log_msg += "SafetyFlags: ";
+      if (s_estop) log_msg += "ESTOP";
+      if (s_estop && s_pstop) log_msg += ", ";
+      if (s_pstop) log_msg += "PSTOP";
+      log_msg += ". ";
+    }
+    
+    if (b_estop) log_msg += "ButtonFlags: ESTOP. ";
+    if (hw_estop) log_msg += "HWFlags: IOB_ESTOP_STALL. ";
+    
+    if (a_ctx_estop || a_cat_safety) {
+      log_msg += "SystemAlarm: ";
+      if (a_ctx_estop) log_msg += "CNTXT_ESTOP";
+      if (a_ctx_estop && a_cat_safety) log_msg += ", ";
+      if (a_cat_safety) log_msg += "CAT_SAFETY_EVENT";
+      log_msg += ". ";
+    }
+
+    RCLCPP_ERROR(get_logger(), "%s", log_msg.c_str());
+    return true; // Violation detected
+  }
+
+  return false; // No violations
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  if (ros_services_) {
+    RCLCPP_INFO(get_logger(), "Deactivating hardware. Pending SetPayload service state: %d", 
+                static_cast<int>(ros_services_->get_kord_services().set_load.get_state()));
+    ros_services_->abortActiveServices();
+  }
+
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
   return CallbackReturn::SUCCESS;
 }
@@ -279,10 +496,14 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   rcv_iface_->fetchData();
 
-  if (rcv_iface_->systemAlarmState())
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected, deactivating...");
-    return hardware_interface::return_type::ERROR;
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_) {
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", 
+      motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str()
+    );
+    motion_flags_prev_ = motion_flags_curr;
   }
 
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
@@ -298,13 +519,64 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
+  
+  if (rcv_iface_->systemAlarmState())
+  {
+    //RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected in read(), deactivating in write()...");
+    return hardware_interface::return_type::OK;
+  }  
 
+  skip_jcontrol_ = false;
+  if (ros_services_) {
+      const auto& kord_services = ros_services_->get_kord_services().as_array();
+      
+      for (auto* service : kord_services) {
+          KordServiceState state = service->get_state();
+          if (state == KordServiceState::REQUESTED) {
+              unsigned int flags = rcv_iface_->getMotionFlags();
+              std::string flag_names = motion_flags_to_string(flags);
+              bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
+              bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
+              
+              double max_v = get_max_joint_velocity();
+              const double VELOCITY_THRESHOLD = 1e-4; // adjust this
+              bool is_stationary = (max_v <= VELOCITY_THRESHOLD);
+              RCLCPP_INFO(get_logger(), 
+                          "VALIDATION [REQUESTED]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
+              
+              if (!is_stationary) {
+                  RCLCPP_WARN(get_logger(), "VALIDATION: Robot is moving. Rejecting async service request.");
+                  service->abort();
+              } else if (is_standby || is_init) {
+                  skip_jcontrol_ = true;
+                  RCLCPP_INFO(get_logger(), 
+                          "VALIDATION [DISPATCHING - calling setLoad!]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
+                  service->dispatch(*ctl_iface_);
+              } else {
+                  skip_jcontrol_ = true;
+                  RCLCPP_INFO_THROTTLE(get_logger(),  *get_clock(), 500,
+                      "VALIDATION: Waiting to dispatch. max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]", 
+                          max_v, is_stationary, is_standby, flags, flag_names.c_str());
+              }
+          } else if (state == KordServiceState::DISPATCHED) {
+              // dispatched but not finished, keep skipping.
+              skip_jcontrol_ = true;
+              service->poll(*rcv_iface_);
+          }
+      }
+  }
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  if (check_and_log_safety_violations()) {
+    return hardware_interface::return_type::DEACTIVATE;
+  }
+
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -312,12 +584,14 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
 
-  if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
-  {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
-    return hardware_interface::return_type::ERROR;
+  if (skip_jcontrol_) {
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "VALIDATION: Skipping directJControl this cycle.");
+  } else {
+    if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds)) {
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
+      return hardware_interface::return_type::ERROR;
+    }
   }
-
   return hardware_interface::return_type::OK;
 }
 
