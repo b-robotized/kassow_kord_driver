@@ -2,18 +2,28 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
   <xacro:arg name="use_mock_hardware" default="true"/>
-  
+
   <xacro:arg name="robot_1_model" default="kr810"/>
   <xacro:arg name="robot_1_prefix" default="kassow_right"/>
   <xacro:arg name="robot_1_ip" default="10.23.23.204"/>
   <xacro:arg name="robot_1_port" default="28283"/>
   <xacro:arg name="robot_1_session_id" default="1"/>
-  
+
+  <xacro:arg name="robot_1_is_async" default="true"/>
+  <xacro:arg name="robot_1_scheduling_policy" default="slave"/>
+  <xacro:arg name="robot_1_thread_priority" default="70"/>
+  <xacro:arg name="robot_1_cpu_affinity" default=""/>
+
   <xacro:arg name="robot_2_model" default="kr810"/>
   <xacro:arg name="robot_2_prefix" default="kassow_left"/>
   <xacro:arg name="robot_2_ip" default="10.23.23.205"/>
   <xacro:arg name="robot_2_port" default="28284"/>
-  <xacro:arg name="robot_2_session_id" default="1"/>
+  <xacro:arg name="robot_2_session_id" default="[2,3]"/>
+
+  <xacro:arg name="robot_2_is_async" default="true"/>
+  <xacro:arg name="robot_2_scheduling_policy" default="slave"/>
+  <xacro:arg name="robot_2_thread_priority" default="70"/>
+  <xacro:arg name="robot_2_cpu_affinity" default="[2,3]"/>
 
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/materials.xacro" />
   <xacro:include filename="$(find kassow_kord_bringup)/urdf/common/inertials.xacro" />
@@ -31,10 +41,14 @@
   <xacro:kassow_kord_ros2_control
     name="$(arg robot_1_prefix)"
     prefix="$(arg robot_1_prefix)"
-    use_mock_hardware="$(arg use_mock_hardware)"
+    ros2_control_hardware_type="$(arg ros2_control_hardware_type)"
     ip_address="$(arg robot_1_ip)"
     port="$(arg robot_1_port)"
     session_id="$(arg robot_1_session_id)"
+    is_async="$(arg robot_1_is_async)"
+    scheduling_policy="$(arg robot_1_scheduling_policy)"
+    thread_priority="$(arg robot_1_thread_priority)"
+    cpu_affinity="$(arg robot_1_cpu_affinity)"
   />
 
   <!-- KASSOW 2 -->
@@ -46,10 +60,14 @@
   <xacro:kassow_kord_ros2_control
     name="$(arg robot_2_prefix)"
     prefix="$(arg robot_2_prefix)"
-    use_mock_hardware="$(arg use_mock_hardware)"
+    ros2_control_hardware_type="$(arg ros2_control_hardware_type)"
     ip_address="$(arg robot_2_ip)"
     port="$(arg robot_2_port)"
     session_id="$(arg robot_2_session_id)"
+    is_async="$(arg robot_2_is_async)"
+    scheduling_policy="$(arg robot_2_scheduling_policy)"
+    thread_priority="$(arg robot_2_thread_priority)"
+    cpu_affinity="$(arg robot_2_cpu_affinity)"
   />
 
 </robot>

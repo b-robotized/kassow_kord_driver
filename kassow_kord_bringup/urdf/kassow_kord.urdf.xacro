@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
   <xacro:arg name="prefix" default="kassow"/>
-  <xacro:arg name="use_mock_hardware" default="true"/>
+  <xacro:arg name="ros2_control_hardware_type" default="mock"/>
   <xacro:arg name="ip_address" default="10.23.23.238"/>
   <xacro:arg name="port" default="28283"/>
   <xacro:arg name="session_id" default="1"/>
@@ -19,13 +19,22 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:call>
 
+  <xacro:arg name="thread_priority" default="70"/>
+  <xacro:arg name="cpu_affinity" default="[2,3]"/>
+  <xacro:arg name="scheduling_policy" default="slave"/>
+  <xacro:arg name="is_async" default="true"/>
+
   <xacro:kassow_kord_ros2_control
     name="$(arg prefix)"
     prefix="$(arg prefix)"
-    use_mock_hardware="$(arg use_mock_hardware)"
+    ros2_control_hardware_type="$(arg ros2_control_hardware_type)"
     ip_address="$(arg ip_address)"
     port="$(arg port)"
+    is_async="$(arg is_async)"
     session_id="$(arg session_id)"
+    thread_priority="$(arg thread_priority)"
+    cpu_affinity="$(arg cpu_affinity)"
+    scheduling_policy="$(arg scheduling_policy)"
   />
 
 </robot>

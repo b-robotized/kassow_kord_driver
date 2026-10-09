@@ -11,7 +11,13 @@
       response_adapters:
         - default_planning_response_adapters/ValidateSolution
         - default_planning_response_adapters/DisplayMotionPath
+        - b_robotized_moveit_plugins/CubicSplineSmoothingAdapter
 
       capabilities: >-
         pilz_industrial_motion_planner/MoveGroupSequenceAction
         pilz_industrial_motion_planner/MoveGroupSequenceService
+
+      path_dev_max: 0.05
+      pos_tol: 0.01
+      max_time_stretch: 1.50
+      seam_eps: 1e-5
