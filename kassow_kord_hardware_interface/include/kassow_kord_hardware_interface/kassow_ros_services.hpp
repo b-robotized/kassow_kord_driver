@@ -1,14 +1,4 @@
-// Copyright (c) 2025 b»robotized
-// All rights reserved.
-//
-// Proprietary License
-//
-// Unauthorized copying of this file, via any medium is strictly prohibited.
-// The file is considered confidential
-//
-// Adapted for <Insert_Company_Name> that received unlimited, worldwide
-// use and change right, except distributing this library separately
-// of their product.
+// Copyright (c) 2026 b»robotized
 
 #ifndef KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_ROS_SERVICES_HPP_
 #define KASSOW_KORD_HARDWARE_INTERFACE__KASSOW_ROS_SERVICES_HPP_
