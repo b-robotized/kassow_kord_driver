@@ -27,6 +27,9 @@ b_controlled_box_cm:
     kassow_right_joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    kassow_gpio_controller:
+      type: gpio_controllers/GpioCommandController
+
 joint_state_broadcaster:
   ros__parameters:
     type: joint_state_broadcaster/JointStateBroadcaster
@@ -125,3 +128,66 @@ kassow_right_joint_trajectory_controller:
     constraints:
       stopped_velocity_tolerance: 0.01 # Defaults to 0.01
       goal_time: 0.0 # Defaults to 0.0 (start immediately)
+
+
+kassow_gpio_controller:
+  ros__parameters:
+    type: gpio_controllers/GpioCommandController
+    gpios:
+      - kassow_digital_IOs
+
+    command_interfaces: # OUTPUTS we can control
+      kassow_digital_IOs:
+        - interfaces:
+          - kassow_RELAY_1
+          - kassow_RELAY_2
+          - kassow_RELAY_3
+          - kassow_RELAY_4
+          - kassow_DO_1
+          - kassow_DO_2
+          - kassow_DO_3
+          - kassow_DO_4
+          - kassow_DO_5
+          - kassow_DO_6
+          - kassow_DO_7
+          - kassow_DO_8
+          - kassow_TB_1
+          - kassow_TB_2
+          - kassow_TB_3
+          - kassow_TB_4
+
+    state_interfaces:
+      kassow_digital_IOs:
+        - interfaces:
+          - kassow_RELAY_1
+          - kassow_RELAY_2
+          - kassow_RELAY_3
+          - kassow_RELAY_4
+          - kassow_DO_1
+          - kassow_DO_2
+          - kassow_DO_3
+          - kassow_DO_4
+          - kassow_DO_5
+          - kassow_DO_6
+          - kassow_DO_7
+          - kassow_DO_8
+          - kassow_TB_1
+          - kassow_TB_2
+          - kassow_TB_3
+          - kassow_TB_4
+          - kassow_DI_1
+          - kassow_DI_2
+          - kassow_DI_3
+          - kassow_DI_4
+          - kassow_DI_5
+          - kassow_DI_6
+          - kassow_DI_7
+          - kassow_DI_8
+          - kassow_DI_9
+          - kassow_DI_10
+          - kassow_DI_11
+          - kassow_DI_12
+          - kassow_DI_13
+          - kassow_DI_14
+          - kassow_DI_15
+          - kassow_DI_16
