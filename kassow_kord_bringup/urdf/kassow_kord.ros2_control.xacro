@@ -168,6 +168,17 @@
 
       </gpio>
 
+      <!-- TCP pose in the robot base frame, as reported by KORD -->
+      <sensor name="${prefix}_tcp_pose">
+        <state_interface name="position.x"/>
+        <state_interface name="position.y"/>
+        <state_interface name="position.z"/>
+        <state_interface name="orientation.x"/>
+        <state_interface name="orientation.y"/>
+        <state_interface name="orientation.z"/>
+        <state_interface name="orientation.w"/>
+      </sensor>
+
     </ros2_control>
 
   </xacro:macro>

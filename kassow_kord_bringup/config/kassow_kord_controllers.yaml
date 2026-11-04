@@ -30,6 +30,9 @@ b_controlled_box_cm:
     kassow_gpio_controller:
       type: gpio_controllers/GpioCommandController
 
+    kassow_tcp_pose_broadcaster:
+      type: pose_broadcaster/PoseBroadcaster
+
 joint_state_broadcaster:
   ros__parameters:
     type: joint_state_broadcaster/JointStateBroadcaster
@@ -191,3 +194,12 @@ kassow_gpio_controller:
           - kassow_DI_14
           - kassow_DI_15
           - kassow_DI_16
+
+
+kassow_tcp_pose_broadcaster:
+  ros__parameters:
+    type: pose_broadcaster/PoseBroadcaster
+    pose_name: kassow_tcp_pose
+    frame_id: kassow_base
+    tf:
+      child_frame_id: kassow_tcp

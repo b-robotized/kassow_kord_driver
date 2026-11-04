@@ -12,6 +12,7 @@
 
 #include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
@@ -339,6 +340,30 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     }
   }
 
+  // Optional TCP pose sensor, with the same interface names as in the UR driver
+  const std::array<std::string, KORD_TCP_POSE_SIZE> tcp_pose_names = {
+    "position.x",    "position.y",    "position.z",   "orientation.x",
+    "orientation.y", "orientation.z", "orientation.w"};
+  for (const hardware_interface::ComponentInfo & sensor : info_.sensors)
+  {
+    for (size_t i = 0; i < KORD_TCP_POSE_SIZE; ++i)
+    {
+      const bool found = std::any_of(
+        sensor.state_interfaces.begin(), sensor.state_interfaces.end(),
+        [&](const auto & itf) { return itf.name == tcp_pose_names[i]; });
+      if (!found)
+      {
+        RCLCPP_ERROR(
+          get_logger(), "Sensor '%s' has no state interface '%s'. Expected a TCP pose sensor.",
+          sensor.name.c_str(), tcp_pose_names[i].c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+      tcp_pose_itfs_[i] = sensor.name + "/" + tcp_pose_names[i];
+    }
+    has_tcp_pose_ = true;
+    RCLCPP_INFO(get_logger(), "TCP pose is exported as sensor '%s'", sensor.name.c_str());
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -654,6 +679,15 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
+  }
+
+  if (has_tcp_pose_)
+  {
+    const auto tcp_pose = rcv_iface_->getTCPWithQuaternion();
+    for (size_t i = 0; i < KORD_TCP_POSE_SIZE; ++i)
+    {
+      set_state(tcp_pose_itfs_[i], tcp_pose[i]);
+    }
   }
 
   read_digital_io();

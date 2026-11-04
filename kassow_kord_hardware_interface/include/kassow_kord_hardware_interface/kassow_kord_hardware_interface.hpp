@@ -43,6 +43,8 @@ namespace kassow_kord_hardware_interface
 const size_t KORD_JOINT_COUNT = 7;
 const size_t KORD_INPUT_COUNT = 16;
 const size_t KORD_OUTPUT_COUNT = 16;
+// TCP pose: position x, y, z and orientation quaternion x, y, z, w
+const size_t KORD_TCP_POSE_SIZE = 7;
 
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
 {
@@ -173,6 +175,10 @@ private:
 
   std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
+
+  // TCP pose state interfaces. Empty if the description has no TCP pose sensor.
+  std::array<std::string, KORD_TCP_POSE_SIZE> tcp_pose_itfs_;
+  bool has_tcp_pose_ = false;
 
   // Digital outputs: bitfield of the outputs confirmed by KORD, and the request in progress.
   uint64_t digital_outputs_sent_ = 0;
