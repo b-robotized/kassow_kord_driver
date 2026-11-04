@@ -31,6 +31,7 @@ add_library(
   ${PROJECT_NAME}
   SHARED
   src/kassow_kord_hardware_interface.cpp
+  src/kassow_ros_services.cpp
 )
 target_include_directories(
   ${PROJECT_NAME}

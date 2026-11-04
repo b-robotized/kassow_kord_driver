@@ -18,8 +18,6 @@
 #include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-#include "realtime_tools/realtime_helpers.hpp"
-
 /**
  * \file kassow_kord_hardware_interface.cpp
  * \brief Hardware interface for Kassow Kord robots using the kord-api.
@@ -354,34 +352,17 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-void KassowKordHardwareInterface::teardown_communication()
-{
-  if (ros_services_)
-  {
-    ros_services_->abortActiveServices();
-  }
-  ros_services_executor_->cancel();
-
-  if (ros_services_thread_.joinable())
-  {
-    ros_services_thread_.join();
-  }
-
-  ros_services_.reset();
-  ros_services_node_.reset();
-
-  if (kord_)
-  {
-    kord_->disconnect();
-  }
-}
-
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // This is heavy for RT error, but it is called from async hw interface
-  // so it should not matter if we block coming from read()
-  teardown_communication();
+  // Called from the RT loop: pause the services thread, but do not join it.
+  if (ros_services_)
+  {
+    ros_services_->pause();
+  }
+  digital_output_service_.abort();
+  digital_output_service_.reset();
+  kord_->disconnect();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -395,7 +376,11 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
     RCLCPP_DEBUG(get_logger(), "clean_alarms() returned false during cleanup");
   }
 
-  teardown_communication();
+  if (ros_services_)
+  {
+    ros_services_->pause();
+  }
+  kord_->disconnect();
 
   RCLCPP_INFO(get_logger(), "Successfully cleaned up");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -405,7 +390,12 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
-  teardown_communication();
+  if (ros_services_)
+  {
+    ros_services_->stop();
+    ros_services_.reset();
+  }
+  kord_->disconnect();
   RCLCPP_INFO(get_logger(), "Successfully shut down!");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -422,53 +412,13 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  // async services
-  ros_services_node_ = std::make_shared<rclcpp::Node>(info_.name + "_services");
-  ros_services_ = std::make_unique<KassowRosServices>(ros_services_node_, rcv_iface_.get());
-
-  ros_services_executor_ = std::make_unique<rclcpp::executors::MultiThreadedExecutor>();
-  ros_services_executor_->add_node(ros_services_node_);
-  ros_services_thread_ = std::thread(
-    [this]()
-    {
-      // As this is inheriting high priority and SCHED_FIFO from hw interface thread,
-      // we want to lower priorities and pin service thread to NRT cores!
-      std::vector<int> target_cores = {0, 1};
-      auto affinity_result = realtime_tools::set_current_thread_affinity(target_cores);
-
-      if (!affinity_result.first)
-      {
-        RCLCPP_WARN(
-          ros_services_node_->get_logger(), "Failed to set thread affinity: %s",
-          affinity_result.second.c_str());
-      }
-      else
-      {
-        RCLCPP_INFO(
-          ros_services_node_->get_logger(),
-          "ROS service thread affinity successfully set to cores 0 and 1.");
-      }
-
-      realtime_tools::set_current_thread_name("kassow_ros_srvs");
-
-      struct sched_param schedp;
-      std::memset(&schedp, 0, sizeof(schedp));
-      schedp.sched_priority = 0;  // SCHED_OTHER
-
-      if (pthread_setschedparam(pthread_self(), SCHED_OTHER, &schedp) != 0)
-      {
-        RCLCPP_WARN(
-          ros_services_node_->get_logger(), "Failed to downgrade thread to SCHED_OTHER. Error: %s",
-          std::strerror(errno));
-      }
-      else
-      {
-        RCLCPP_INFO(
-          ros_services_node_->get_logger(),
-          "ROS service thread successfully downgraded to SCHED_OTHER scheduling.");
-      }
-      ros_services_executor_->spin();
-    });
+  // The services thread is created once and runs until on_shutdown. It starts paused.
+  if (!ros_services_)
+  {
+    update_rate_ = info_.rw_rate > 0 ? info_.rw_rate : update_rate_;
+    ros_services_ = std::make_unique<KassowRosServices>(info_.name + "_services", update_rate_);
+    ros_services_->start();
+  }
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -522,9 +472,26 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
 
-  // Read initial Outputs and set them as the initial command values
-  prev_io_cmd_sent = rcv_iface_->getDigitalOutput();
-  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", prev_io_cmd_sent);
+  // Read the current outputs and use them as the initial output commands
+  digital_outputs_sent_ = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
+  digital_output_service_.reset();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (!digital_outputs_itfs_[i].empty())
+    {
+      const double value =
+        bit_helpers::bit_to_double(bit_helpers::is_set(digital_outputs_sent_, i));
+      set_state(digital_outputs_itfs_[i], value);
+      set_command(digital_outputs_itfs_[i], value);
+    }
+  }
+  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", digital_outputs_sent_);
+
+  skip_jcontrol_ = false;
+  if (ros_services_)
+  {
+    ros_services_->resume();
+  }
 
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
@@ -542,11 +509,11 @@ bool KassowKordHardwareInterface::check_and_log_safety_violations()
 
   if (ros_services_)
   {
-    ros_services_->shared_state_.motion_flags.store(motion_flags, std::memory_order_relaxed);
-    ros_services_->shared_state_.safety_flags.store(safety_flags, std::memory_order_relaxed);
-    ros_services_->shared_state_.button_flags.store(button_flags, std::memory_order_relaxed);
-    ros_services_->shared_state_.hw_flags.store(hw_flags, std::memory_order_relaxed);
-    ros_services_->shared_state_.alarm_state.store(alarm_state, std::memory_order_relaxed);
+    ros_services_->robot_state().motion_flags.store(motion_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().safety_flags.store(safety_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().button_flags.store(button_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().hw_flags.store(hw_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().alarm_state.store(alarm_state, std::memory_order_relaxed);
   }
 
   // 2. Evaluate individual triggers using the local enums
@@ -645,11 +612,10 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
 {
   if (ros_services_)
   {
-    RCLCPP_INFO(
-      get_logger(), "Deactivating hardware. Pending SetPayload service state: %d",
-      static_cast<int>(ros_services_->get_kord_services().set_load.get_state()));
-    ros_services_->abortActiveServices();
+    ros_services_->pause();
   }
+  digital_output_service_.abort();
+  digital_output_service_.reset();
 
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
   return CallbackReturn::SUCCESS;
@@ -690,157 +656,120 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
-  // Get the Digital Inputs
-  // TODO(habartakh): How do we manage a scenario for two enable/disable requests
-  const uint64_t digital_input = static_cast<uint64_t>(rcv_iface_->getDigitalInput());
-  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
-  {
-    if (digital_inputs_itfs_[i].empty())
-    {
-      continue;
-    }
-    const bool bit = bit_helpers::is_set(digital_input, i);
-    const double input_value = bit_helpers::bit_to_double(bit);
-    set_state(digital_inputs_itfs_[i], input_value);
-  }
-
-  // Get the digital Outputs
-  const uint64_t digital_output = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
-  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
-  {
-    if (digital_outputs_itfs_[i].empty())
-    {
-      continue;
-    }
-    const bool bit = bit_helpers::is_set(digital_output, i);
-    const double output_value = bit_helpers::bit_to_double(bit);
-    set_state(digital_outputs_itfs_[i], output_value);
-  }
-
-  // Check if the IO write request is being processed or not
-  if (ongoing_request_processing)
-  {
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "Currently processing request with RID %ld ...",
-      io_request.request_rid_);
-
-    auto latest_response = rcv_iface_->getLatestRequest();
-
-    // If the 1 second elapsed without confirming reception of the request
-    auto time_elapsed = std::chrono::steady_clock::now() - init_time;
-    if (time_elapsed > std::chrono::seconds(1))
-    {
-      RCLCPP_ERROR(get_logger(), "TIMEOUT: Request with RID %ld. ", latest_response.request_rid_);
-
-      pending_enable_mask = 0;
-      pending_disable_mask = 0;
-      ongoing_request_processing = false;
-      // return hardware_interface::return_type::ERROR; stop or not?
-    }
-    else  // Timeout not reached yet
-    {
-      // Check if the sent IO request is being evaluated
-      if (io_request.request_rid_ != latest_response.request_rid_)
-      {
-        RCLCPP_INFO(get_logger(), "Latest request does not correspond to sent request...");
-      }
-
-      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eSuccess)
-      {
-        RCLCPP_INFO(
-          get_logger(), "SUCCESS: Request with RID %ld, transfer finished.",
-          latest_response.request_rid_);
-
-        // Mark enabled / disabled bits as sent
-        prev_io_cmd_sent |= pending_enable_mask;
-        prev_io_cmd_sent &= ~pending_disable_mask;
-
-        pending_enable_mask = 0;
-        pending_disable_mask = 0;
-        ongoing_request_processing = false;
-      }
-
-      if (latest_response.request_status_ == kr2::kord::protocol::EControlCommandStatus::eFailure)
-      {
-        RCLCPP_ERROR(
-          get_logger(), "ERROR: Request with RID %ld, transfer failed.",
-          latest_response.request_rid_);
-
-        pending_enable_mask = 0;
-        pending_disable_mask = 0;
-        ongoing_request_processing = false;
-
-        // return hardware_interface::return_type::ERROR; return error or continue sending commands?
-      }
-    }
-  }
-
+  read_digital_io();
+  update_digital_output_request();
 
   if (rcv_iface_->systemAlarmState())
   {
-    // RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected in read(),
-    // deactivating in write()...");
+    // write() deactivates the hardware on safety violations
     return hardware_interface::return_type::OK;
   }
 
-  skip_jcontrol_ = false;
-  if (ros_services_)
+  process_ros_services();
+  return hardware_interface::return_type::OK;
+}
+
+void KassowKordHardwareInterface::read_digital_io()
+{
+  const auto digital_input = static_cast<uint64_t>(rcv_iface_->getDigitalInput());
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
   {
-    const auto & kord_services = ros_services_->get_kord_services().as_array();
-
-    for (auto * service : kord_services)
+    if (!digital_inputs_itfs_[i].empty())
     {
-      KordServiceState state = service->get_state();
-      if (state == KordServiceState::REQUESTED)
-      {
-        unsigned int flags = rcv_iface_->getMotionFlags();
-        std::string flag_names = motion_flags_to_string(flags);
-        bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
-        bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
-
-        double max_v = get_max_joint_velocity();
-        const double VELOCITY_THRESHOLD = 1e-4;  // adjust this
-        bool is_stationary = (max_v <= VELOCITY_THRESHOLD);
-        RCLCPP_INFO(
-          get_logger(),
-          "VALIDATION [REQUESTED]: max_vel: %e, is_stationary: %d, is_standby: %d, flags: %u [%s]",
-          max_v, is_stationary, is_standby, flags, flag_names.c_str());
-
-        if (!is_stationary)
-        {
-          RCLCPP_WARN(
-            get_logger(), "VALIDATION: Robot is moving. Rejecting async service request.");
-          service->abort();
-        }
-        else if (is_standby || is_init)
-        {
-          skip_jcontrol_ = true;
-          RCLCPP_INFO(
-            get_logger(),
-            "VALIDATION [DISPATCHING - calling setLoad!]: max_vel: %e, is_stationary: %d, "
-            "is_standby: %d, flags: %u [%s]",
-            max_v, is_stationary, is_standby, flags, flag_names.c_str());
-          service->dispatch(*ctl_iface_);
-        }
-        else
-        {
-          skip_jcontrol_ = true;
-          RCLCPP_INFO_THROTTLE(
-            get_logger(), *get_clock(), 500,
-            "VALIDATION: Waiting to dispatch. max_vel: %e, is_stationary: %d, is_standby: %d, "
-            "flags: %u [%s]",
-            max_v, is_stationary, is_standby, flags, flag_names.c_str());
-        }
-      }
-      else if (state == KordServiceState::DISPATCHED)
-      {
-        // dispatched but not finished, keep skipping.
-        skip_jcontrol_ = true;
-        service->poll(*rcv_iface_);
-      }
+      set_state(
+        digital_inputs_itfs_[i], bit_helpers::bit_to_double(bit_helpers::is_set(digital_input, i)));
     }
   }
-  return hardware_interface::return_type::OK;
+
+  const auto digital_output = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (!digital_outputs_itfs_[i].empty())
+    {
+      set_state(
+        digital_outputs_itfs_[i],
+        bit_helpers::bit_to_double(bit_helpers::is_set(digital_output, i)));
+    }
+  }
+}
+
+// IO request: monitored with the request ID. directJControl is not paused.
+void KassowKordHardwareInterface::update_digital_output_request()
+{
+  if (digital_output_service_.get_state() == KordServiceState::DISPATCHED)
+  {
+    digital_output_service_.poll(*rcv_iface_);
+  }
+  if (!digital_output_service_.is_finished())
+  {
+    return;
+  }
+
+  const auto rid = digital_output_service_.get_request_rid();
+  switch (digital_output_service_.release())
+  {
+    case KordServiceState::SUCCESS:
+      digital_outputs_sent_ |= digital_output_service_.get_enable_mask();
+      digital_outputs_sent_ &= ~digital_output_service_.get_disable_mask();
+      RCLCPP_INFO(get_logger(), "Digital output request %ld finished.", rid);
+      break;
+    case KordServiceState::TIMEOUT:
+      RCLCPP_ERROR(get_logger(), "Digital output request %ld timed out.", rid);
+      break;
+    default:
+      RCLCPP_ERROR(get_logger(), "Digital output request %ld failed.", rid);
+      break;
+  }
+}
+
+void KassowKordHardwareInterface::process_ros_services()
+{
+  skip_jcontrol_ = false;
+  if (!ros_services_)
+  {
+    return;
+  }
+
+  // GetPayload: read from memory, updated by fetchData() in this cycle.
+  ros_services_->get_payload().serve(*rcv_iface_);
+
+  // SetLoad: monitored with the command token. directJControl is paused until it finishes.
+  auto & set_load = ros_services_->set_load();
+  const auto state = set_load.get_state();
+  if (state == KordServiceState::REQUESTED)
+  {
+    const unsigned int flags = rcv_iface_->getMotionFlags();
+    const bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
+    const bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
+    const double max_v = get_max_joint_velocity();
+    const double VELOCITY_THRESHOLD = 1e-4;
+
+    if (max_v > VELOCITY_THRESHOLD)
+    {
+      RCLCPP_WARN(get_logger(), "SetLoad: robot is moving (max_vel: %e). Rejecting.", max_v);
+      set_load.abort();
+    }
+    else if (is_standby || is_init)
+    {
+      skip_jcontrol_ = true;
+      RCLCPP_INFO(
+        get_logger(), "SetLoad: dispatching. Motion flags: [%s]",
+        motion_flags_to_string(flags).c_str());
+      set_load.dispatch(*ctl_iface_);
+    }
+    else
+    {
+      skip_jcontrol_ = true;
+      RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), 500, "SetLoad: waiting for STANDBY. Motion flags: [%s]",
+        motion_flags_to_string(flags).c_str());
+    }
+  }
+  else if (state == KordServiceState::DISPATCHED)
+  {
+    skip_jcontrol_ = true;
+    set_load.poll(*rcv_iface_);
+  }
 }
 
 hardware_interface::return_type KassowKordHardwareInterface::write(
@@ -851,7 +780,6 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     return hardware_interface::return_type::DEACTIVATE;
   }
 
-  // Joint Commands
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -862,107 +790,64 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
   if (skip_jcontrol_)
   {
     RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 500, "VALIDATION: Skipping directJControl this cycle.");
+      get_logger(), *get_clock(), 500, "SetLoad in progress: skipping directJControl.");
   }
-  else
+  else if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
   {
-    if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
-    {
-      RCLCPP_ERROR_THROTTLE(
-        get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
-      return hardware_interface::return_type::ERROR;
-    }
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
+    return hardware_interface::return_type::ERROR;
   }
 
-  // IO commands
+  write_digital_outputs();
+  return hardware_interface::return_type::OK;
+}
 
-  // Build the desired mask from the command interfaces
-  uint64_t desired_mask = prev_io_cmd_sent;
+void KassowKordHardwareInterface::write_digital_outputs()
+{
+  // One IO request at a time
+  if (digital_output_service_.get_state() != KordServiceState::IDLE)
+  {
+    return;
+  }
 
+  uint64_t desired = digital_outputs_sent_;
   for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
   {
     if (digital_outputs_itfs_[i].empty())
     {
       continue;
     }
-
     const double cmd = get_command(digital_outputs_itfs_[i]);
-
     if (std::isnan(cmd))
     {
-      // NaN means no command was set for this output, leave the bit unchanged
-      continue;
+      continue;  // no command: keep the output as it is
     }
-    if (cmd > 0.5)
-    {
-      desired_mask = bit_helpers::set(desired_mask, i);  // turn on bit i
-    }
-    else
-    {
-      desired_mask = bit_helpers::clear(desired_mask, i);  // turn off bit i
-    }
+    desired = bit_helpers::double_to_bit(cmd) ? bit_helpers::set(desired, i)
+                                              : bit_helpers::clear(desired, i);
   }
 
-  const bool command_changed = desired_mask != prev_io_cmd_sent;
-
-  RCLCPP_INFO_THROTTLE(
-    get_logger(), *get_clock(), 2000, "desired_mask: 0x%016lX, command_changed: %s", desired_mask,
-    command_changed ? "true" : "false");
-
-  // Only send a command if something actually changed AND no request is currently being processed
-  if (command_changed && !ongoing_request_processing)
+  const uint64_t enable_mask = bit_helpers::get_bits_to_enable(desired, digital_outputs_sent_);
+  const uint64_t disable_mask = bit_helpers::get_bits_to_disable(desired, digital_outputs_sent_);
+  if (!enable_mask && !disable_mask)
   {
-    ongoing_request_processing = true;
-
-    const uint64_t enable_mask = bit_helpers::get_bits_to_enable(desired_mask, prev_io_cmd_sent);
-    const uint64_t disable_mask = bit_helpers::get_bits_to_disable(desired_mask, prev_io_cmd_sent);
-
-    RCLCPP_INFO_THROTTLE(
-      get_logger(), *get_clock(), 2000, "enable_mask: 0x%016lX, disable_mask: 0x%016lX",
-      enable_mask, disable_mask);
-
-    if (enable_mask && disable_mask)
-    {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "Both enable_mask (0x%016lX) and disable_mask (0x%016lX) are non-zero. "
-        "Simultaneous enable and disable is not supported — skipping IO request.",
-        enable_mask, disable_mask);
-
-      return hardware_interface::return_type::OK;
-    }
-    else if (enable_mask)  // Set bits to 1
-    {
-      io_request.asSetIODigitalOut().withEnabledPorts(
-        enable_mask);  // Only send enable OR disable per request
-      ctl_iface_->transmitRequest(io_request);
-
-      RCLCPP_INFO(
-        get_logger(),
-        "Sent request with ID: %ld to enable ports corresponding to the following mask: 0x%016lX",
-        io_request.request_rid_, enable_mask);
-
-      pending_enable_mask = enable_mask;
-      pending_disable_mask = 0;
-    }
-    else  // Set bits to 0
-    {
-      io_request.asSetIODigitalOut().withDisabledPorts(disable_mask);
-      ctl_iface_->transmitRequest(io_request);
-
-      RCLCPP_INFO(
-        get_logger(),
-        "Sent request with ID: %ld to disable ports corresponding to the following mask: 0x%016lX",
-        io_request.request_rid_, disable_mask);
-
-      pending_disable_mask = disable_mask;
-      pending_enable_mask = 0;
-    }
-
-    pending_io_rid = io_request.request_rid_;      // track the request
-    init_time = std::chrono::steady_clock::now();  // Start the timer
+    return;
   }
-  return hardware_interface::return_type::OK;
+
+  // KORD takes either enabled or disabled ports per request. Enable first, disable in the next
+  // request after this one is finished.
+  const size_t timeout_ticks = update_rate_;  // 1 s
+  if (enable_mask)
+  {
+    digital_output_service_.dispatch(*ctl_iface_, enable_mask, 0, timeout_ticks);
+  }
+  else
+  {
+    digital_output_service_.dispatch(*ctl_iface_, 0, disable_mask, timeout_ticks);
+  }
+  RCLCPP_INFO(
+    get_logger(), "Digital output request %ld sent: enable 0x%016lX, disable 0x%016lX",
+    digital_output_service_.get_request_rid(), digital_output_service_.get_enable_mask(),
+    digital_output_service_.get_disable_mask());
 }
 
 // clean all alarms

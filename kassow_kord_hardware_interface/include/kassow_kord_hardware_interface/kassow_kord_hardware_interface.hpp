@@ -35,7 +35,8 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
-#include "kassow_ros_services.hpp"
+#include "kassow_kord_hardware_interface/kassow_ros_services.hpp"
+#include "kassow_kord_hardware_interface/kord_services.hpp"
 
 namespace kassow_kord_hardware_interface
 {
@@ -144,7 +145,10 @@ public:
 private:
   bool check_and_log_safety_violations();
   bool clean_alarms();
-  void teardown_communication();
+  void read_digital_io();
+  void update_digital_output_request();
+  void process_ros_services();
+  void write_digital_outputs();
   // bool is_robot_stationary() const;
   double get_max_joint_velocity() const;
   std::string motion_flags_to_string(unsigned int flags) const;
@@ -168,30 +172,20 @@ private:
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
 
   std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
-
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
 
-  uint64_t prev_io_cmd_sent;         // Bitmask of the previous IO commands sent
-  uint64_t pending_enable_mask{0};   // Enable mask awaiting hardware confirmation
-  uint64_t pending_disable_mask{0};  // Disable mask awaiting hardware confirmation
-  kr2::kord::RequestIO io_request;   // Request to send output commands
-  int64_t pending_io_rid;            // Identifier of the latest write request sent
-  std::chrono::time_point<std::chrono::steady_clock>
-    init_time;  // Timer starting point to calculate timeout for outputs setup
-  bool ongoing_request_processing;
+  // Digital outputs: bitfield of the outputs confirmed by KORD, and the request in progress.
+  uint64_t digital_outputs_sent_ = 0;
+  KordDigitalOutputService digital_output_service_;
 
   std::string ip_address;
   int session_id;
   int port;
   int waitSync_timeout_ms;
 
-  // Async services:
+  // ROS services in their own NRT thread. Created in on_configure, stopped in on_shutdown.
   std::unique_ptr<KassowRosServices> ros_services_;
-  rclcpp::Node::SharedPtr ros_services_node_;
-  std::thread ros_services_thread_;
-  // IMPORTANT: when we add other services, we are assuming KORD-API can take multiple concurrent
-  // services if not, we gotta lock mutex to ensure only one gets called at a time.
-  std::unique_ptr<rclcpp::executors::MultiThreadedExecutor> ros_services_executor_;
+  size_t update_rate_ = 500;
 
   // Testing, to be removed:
   unsigned int motion_flags_prev_ = 0xFFFFFFFF;
