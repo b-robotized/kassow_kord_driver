@@ -69,11 +69,10 @@ install(
 if(ENABLE_TEST)
   ament_add_gmock(test_kassow_kord_hardware_interface test/test_kassow_kord_hardware_interface.cpp)
   target_include_directories(test_kassow_kord_hardware_interface PRIVATE include)
-  ament_target_dependencies(
-    test_kassow_kord_hardware_interface
-    hardware_interface
-    pluginlib
-    ros2_control_test_assets
+  target_link_libraries(test_kassow_kord_hardware_interface
+    ${hardware_interface_TARGETS}
+    ${pluginlib_TARGETS}
+    ${ros2_control_test_assets_TARGETS}
   )
 endif()
 
