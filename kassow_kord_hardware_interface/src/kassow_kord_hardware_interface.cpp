@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "kassow_kord_hardware_interface/bit_helpers.hpp"
@@ -452,6 +453,14 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  // Refuse to activate while a stop flag is set. clean_alarms() cannot clear these flags.
+  rcv_iface_->fetchData();
+  if (const auto tripped = find_tripped_flags(FlagScope::UNCLEARABLE))
+  {
+    RCLCPP_ERROR(get_logger(), "Cannot activate. Tripped: %s", tripped->c_str());
+    return hardware_interface::CallbackReturn::FAILURE;
+  }
+
   // Reset robot errors and alarms as needed
   try
   {
@@ -469,6 +478,14 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial joint positions and set them as the initial command values
   rcv_iface_->fetchData();
+
+  // Refuse to activate if the robot is not in an allowed state after the alarms are cleared.
+  if (const auto tripped = find_tripped_flags(FlagScope::ALL))
+  {
+    RCLCPP_ERROR(get_logger(), "Cannot activate. Tripped: %s", tripped->c_str());
+    return hardware_interface::CallbackReturn::FAILURE;
+  }
+  deactivate_latched_ = false;
 
   unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
   if (motion_flags_curr != motion_flags_prev_)
@@ -523,14 +540,62 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
-bool KassowKordHardwareInterface::check_and_log_safety_violations()
+namespace
 {
-  // 1. Fetch current status flags
-  unsigned int motion_flags = rcv_iface_->getMotionFlags();
-  unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
-  unsigned int button_flags = rcv_iface_->getButtonFlags();
-  unsigned int hw_flags = rcv_iface_->getHWFlags();
-  uint32_t alarm_state = rcv_iface_->systemAlarmState();
+struct FlagName
+{
+  unsigned int bit;
+  const char * name;
+};
+
+constexpr FlagName SAFETY_NAMES[] = {
+  {KassowKordHardwareInterface::SAFETY_FLAG_ESTOP, "ESTOP"},
+  {KassowKordHardwareInterface::SAFETY_FLAG_PSTOP, "PSTOP"},
+  {KassowKordHardwareInterface::SAFETY_FLAG_SSTOP, "SSTOP"},
+  {KassowKordHardwareInterface::SAFETY_FLAG_USER_CONF_REQ, "USER_CONF_REQ"}};
+
+constexpr FlagName BUTTON_NAMES[] = {
+  {KassowKordHardwareInterface::BUTTONS_FLAG_ESTOP, "ESTOP"},
+  {KassowKordHardwareInterface::BUTTONS_FLAG_PSTOP, "PSTOP"},
+  {KassowKordHardwareInterface::BUTTONS_FLAG_BACKDRIVE, "BACKDRIVE"},
+  {KassowKordHardwareInterface::BUTTONS_FLAG_TEACH, "TEACH"}};
+
+constexpr FlagName HW_NAMES[] = {
+  {KassowKordHardwareInterface::HW_FLAG_RUID_MISMATCH, "RUID_MISMATCH"},
+  {KassowKordHardwareInterface::HW_FLAG_HARD_FAULT, "HARD_FAULT"},
+  {KassowKordHardwareInterface::HW_FLAG_DISCOVERY_FAILED, "DISCOVERY_FAILED"},
+  {KassowKordHardwareInterface::HW_FLAG_ERROR_BITS_SET, "ERROR_BITS_SET"},
+  {KassowKordHardwareInterface::HW_FLAG_DEVICE_DISABLED, "DEVICE_DISABLED"},
+  {KassowKordHardwareInterface::HW_FLAG_LOW_VOLTAGE, "LOW_VOLTAGE"},
+  {KassowKordHardwareInterface::HW_FLAG_IOB_INIT_TIMEOUT, "IOB_INIT_TIMEOUT"},
+  {KassowKordHardwareInterface::HW_FLAG_SYNC_INIT_TIMEOUT, "SYNC_INIT_TIMEOUT"},
+  {KassowKordHardwareInterface::HW_FLAG_IOB_ESTOP_STALL, "IOB_ESTOP_STALL"},
+  {KassowKordHardwareInterface::HW_FLAG_IOB_PSTOP_STALL, "IOB_PSTOP_STALL"}};
+
+template <size_t N>
+std::string flag_names(unsigned int flags, const FlagName (&table)[N])
+{
+  std::string names;
+  for (const auto & [bit, name] : table)
+  {
+    if (flags & bit)
+    {
+      names += std::string(name) + " ";
+    }
+  }
+  return names;
+}
+}  // namespace
+
+// Returns the tripped flags as text, or nothing if no flag is tripped.
+// With UNCLEARABLE, the motion and alarm flags that clean_alarms() can clear are not tested.
+std::optional<std::string> KassowKordHardwareInterface::find_tripped_flags(FlagScope scope)
+{
+  const unsigned int motion_flags = rcv_iface_->getMotionFlags();
+  const unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
+  const unsigned int button_flags = rcv_iface_->getButtonFlags();
+  const unsigned int hw_flags = rcv_iface_->getHWFlags();
+  const uint32_t alarm_state = rcv_iface_->systemAlarmState();
 
   if (ros_services_)
   {
@@ -541,95 +606,54 @@ bool KassowKordHardwareInterface::check_and_log_safety_violations()
     ros_services_->robot_state().alarm_state.store(alarm_state, std::memory_order_relaxed);
   }
 
-  // 2. Evaluate individual triggers using the local enums
-  bool m_halt = motion_flags & MotionFlags::MOTION_FLAG_HALT;
-  bool m_susp = motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED;
-  bool s_estop = safety_flags & SafetyFlags::SAFETY_FLAG_ESTOP;
-  bool s_pstop = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
-
-  bool b_estop = button_flags & ButtonFlags::BUTTONS_FLAG_ESTOP;
-  bool hw_estop = hw_flags & HWFlags::HW_FLAG_IOB_ESTOP_STALL;
-
-  // Extract packed Category (bits 0-3) and Context (bits 4-7)
-  uint8_t current_cat = alarm_state & 0x0F;
-  uint8_t current_cntxt = (alarm_state >> 4) & 0x0F;
-
-  bool a_ctx_estop = (current_cntxt == SystemAlarmContext::CNTXT_ESTOP);
-  bool a_cat_safety = (current_cat == SystemAlarmCategory::CAT_SAFETY_EVENT);
-
-  // 3. Trigger condition and format comprehensive log
-  if (m_halt || m_susp || s_estop || s_pstop || b_estop || hw_estop || a_ctx_estop || a_cat_safety)
+  std::string msg;
+  const auto add = [&msg](const char * word, unsigned int tripped, const std::string & names)
   {
-    std::string log_msg = "Deactivating. FLags: ";
-
-    if (m_halt || m_susp)
+    if (tripped == 0)
     {
-      log_msg += "Motion: ";
-      if (m_halt)
-      {
-        log_msg += "HALT";
-      }
-      if (m_halt && m_susp)
-      {
-        log_msg += ", ";
-      }
-      if (m_susp)
-      {
-        log_msg += "SUSPENDED";
-      }
-      log_msg += ". ";
+      return;
     }
+    char hex[16];
+    std::snprintf(hex, sizeof(hex), "0x%X", tripped);
+    msg += std::string(word) + " " + hex + " " + names + "| ";
+  };
 
-    if (s_estop || s_pstop)
-    {
-      log_msg += "SafetyFlags: ";
-      if (s_estop)
-      {
-        log_msg += "ESTOP";
-      }
-      if (s_estop && s_pstop)
-      {
-        log_msg += ", ";
-      }
-      if (s_pstop)
-      {
-        log_msg += "PSTOP";
-      }
-      log_msg += ". ";
-    }
+  const unsigned int safety_tripped = safety_flags & STOP_SAFETY_FLAGS;
+  const unsigned int button_tripped = button_flags & STOP_BUTTON_FLAGS;
+  add("Safety", safety_tripped, flag_names(safety_tripped, SAFETY_NAMES));
+  add("Button", button_tripped, flag_names(button_tripped, BUTTON_NAMES));
+  add("HW", hw_flags, flag_names(hw_flags, HW_NAMES));
 
-    if (b_estop)
-    {
-      log_msg += "ButtonFlags: ESTOP. ";
-    }
-    if (hw_estop)
-    {
-      log_msg += "HWFlags: IOB_ESTOP_STALL. ";
-    }
+  if (scope == FlagScope::ALL)
+  {
+    const unsigned int motion_tripped = motion_flags & ~ALLOWED_MOTION_FLAGS;
+    add("Motion", motion_tripped, motion_flags_to_string(motion_tripped));
 
-    if (a_ctx_estop || a_cat_safety)
+    // The alarm state packs the category in bits 0-3 and the context in bits 4-7.
+    std::string alarm_names;
+    if (((alarm_state >> 4) & 0x0F) == CNTXT_ESTOP)
     {
-      log_msg += "SystemAlarm: ";
-      if (a_ctx_estop)
-      {
-        log_msg += "CNTXT_ESTOP";
-      }
-      if (a_ctx_estop && a_cat_safety)
-      {
-        log_msg += ", ";
-      }
-      if (a_cat_safety)
-      {
-        log_msg += "CAT_SAFETY_EVENT";
-      }
-      log_msg += ". ";
+      alarm_names += "CNTXT_ESTOP ";
     }
-
-    RCLCPP_ERROR(get_logger(), "%s", log_msg.c_str());
-    return true;  // Violation detected
+    if ((alarm_state & 0x0F) == CAT_SAFETY_EVENT)
+    {
+      alarm_names += "CAT_SAFETY_EVENT ";
+    }
+    if (!alarm_names.empty())
+    {
+      add("Alarm", alarm_state, alarm_names);
+    }
   }
 
-  return false;  // No violations
+  if (msg.empty())
+  {
+    return std::nullopt;
+  }
+  char all[128];
+  std::snprintf(
+    all, sizeof(all), "Flags: motion=0x%X safety=0x%X button=0x%X hw=0x%X alarm=0x%X",
+    motion_flags, safety_flags, button_flags, hw_flags, alarm_state);
+  return msg + all;
 }
 
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
@@ -809,7 +833,15 @@ void KassowKordHardwareInterface::process_ros_services()
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  if (check_and_log_safety_violations())
+  if (!deactivate_latched_)
+  {
+    if (const auto tripped = find_tripped_flags(FlagScope::ALL))
+    {
+      RCLCPP_ERROR(get_logger(), "Deactivating. Tripped: %s", tripped->c_str());
+      deactivate_latched_ = true;
+    }
+  }
+  if (deactivate_latched_)
   {
     return hardware_interface::return_type::DEACTIVATE;
   }

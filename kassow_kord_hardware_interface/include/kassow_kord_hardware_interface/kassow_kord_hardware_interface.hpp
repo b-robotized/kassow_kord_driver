@@ -24,6 +24,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -144,8 +145,23 @@ public:
     CNTXT_SYSERR = 0x08
   };
 
+  // Motion flags that are normal while the hardware is active.
+  // Any other motion flag deactivates it.
+  static constexpr unsigned int ALLOWED_MOTION_FLAGS = MOTION_FLAG_STANDBY | MOTION_FLAG_TRACKING;
+  // Safety and button flags that deactivate the hardware. Any HW flag deactivates it.
+  static constexpr unsigned int STOP_SAFETY_FLAGS =
+    SAFETY_FLAG_ESTOP | SAFETY_FLAG_PSTOP | SAFETY_FLAG_SSTOP | SAFETY_FLAG_USER_CONF_REQ;
+  static constexpr unsigned int STOP_BUTTON_FLAGS =
+    BUTTONS_FLAG_ESTOP | BUTTONS_FLAG_PSTOP | BUTTONS_FLAG_BACKDRIVE | BUTTONS_FLAG_TEACH;
+
 private:
-  bool check_and_log_safety_violations();
+  // UNCLEARABLE: flags that clean_alarms() cannot clear. ALL: also the flags it can clear.
+  enum class FlagScope
+  {
+    UNCLEARABLE,
+    ALL
+  };
+  std::optional<std::string> find_tripped_flags(FlagScope scope);
   bool clean_alarms();
   void read_digital_io();
   void update_digital_output_request();
@@ -196,6 +212,10 @@ private:
   // Testing, to be removed:
   unsigned int motion_flags_prev_ = 0xFFFFFFFF;
   bool skip_jcontrol_ = false;
+
+  // Set at the first tripped flag and cleared in on_activate(). The async worker can overwrite a
+  // DEACTIVATE result before the controller manager reads it, so write() returns it again.
+  bool deactivate_latched_ = false;
 };
 
 }  // namespace kassow_kord_hardware_interface
