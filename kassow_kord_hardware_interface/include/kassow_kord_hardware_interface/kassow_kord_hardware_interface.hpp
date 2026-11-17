@@ -162,6 +162,7 @@ private:
     ALL
   };
   std::optional<std::string> find_tripped_flags(FlagScope scope);
+  void log_flags(const char * event, bool only_on_change);
   bool clean_alarms();
   void read_digital_io();
   void update_digital_output_request();
@@ -210,7 +211,8 @@ private:
   size_t update_rate_ = 500;
 
   // Testing, to be removed:
-  unsigned int motion_flags_prev_ = 0xFFFFFFFF;
+  // Motion, safety, button, HW and alarm flags at the last log. The start value forces a log.
+  std::array<unsigned int, 5> flags_logged_{~0u, ~0u, ~0u, ~0u, ~0u};
   bool skip_jcontrol_ = false;
 
   // Set at the first tripped flag and cleared in on_activate(). The async worker can overwrite a

@@ -455,6 +455,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 {
   // Refuse to activate while a stop flag is set. clean_alarms() cannot clear these flags.
   rcv_iface_->fetchData();
+  log_flags("Activation start", false);
   if (const auto tripped = find_tripped_flags(FlagScope::UNCLEARABLE))
   {
     RCLCPP_ERROR(get_logger(), "Cannot activate. Tripped: %s", tripped->c_str());
@@ -478,6 +479,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial joint positions and set them as the initial command values
   rcv_iface_->fetchData();
+  log_flags("Alarms cleared", false);
 
   // Refuse to activate if the robot is not in an allowed state after the alarms are cleared.
   if (const auto tripped = find_tripped_flags(FlagScope::ALL))
@@ -486,15 +488,6 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     return hardware_interface::CallbackReturn::FAILURE;
   }
   deactivate_latched_ = false;
-
-  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
-  if (motion_flags_curr != motion_flags_prev_)
-  {
-    RCLCPP_INFO(
-      get_logger(), "Motion state: %s -> %s", motion_flags_to_string(motion_flags_prev_).c_str(),
-      motion_flags_to_string(motion_flags_curr).c_str());
-    motion_flags_prev_ = motion_flags_curr;
-  }
 
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
@@ -549,6 +542,7 @@ struct FlagName
 };
 
 constexpr FlagName SAFETY_NAMES[] = {
+  {KassowKordHardwareInterface::SAFETY_FLAG_UPDATE, "UPDATE"},
   {KassowKordHardwareInterface::SAFETY_FLAG_ESTOP, "ESTOP"},
   {KassowKordHardwareInterface::SAFETY_FLAG_PSTOP, "PSTOP"},
   {KassowKordHardwareInterface::SAFETY_FLAG_SSTOP, "SSTOP"},
@@ -557,6 +551,7 @@ constexpr FlagName SAFETY_NAMES[] = {
 constexpr FlagName BUTTON_NAMES[] = {
   {KassowKordHardwareInterface::BUTTONS_FLAG_ESTOP, "ESTOP"},
   {KassowKordHardwareInterface::BUTTONS_FLAG_PSTOP, "PSTOP"},
+  {KassowKordHardwareInterface::BUTTONS_FLAG_TOGGLE, "TOGGLE"},
   {KassowKordHardwareInterface::BUTTONS_FLAG_BACKDRIVE, "BACKDRIVE"},
   {KassowKordHardwareInterface::BUTTONS_FLAG_TEACH, "TEACH"}};
 
@@ -586,6 +581,25 @@ std::string flag_names(unsigned int flags, const FlagName (&table)[N])
   return names;
 }
 }  // namespace
+
+// Logs all status flags. With only_on_change, it logs only if a flag changed since the last log.
+void KassowKordHardwareInterface::log_flags(const char * event, bool only_on_change)
+{
+  const std::array<unsigned int, 5> flags = {
+    rcv_iface_->getMotionFlags(), rcv_iface_->getRobotSafetyFlags(), rcv_iface_->getButtonFlags(),
+    rcv_iface_->getHWFlags(), rcv_iface_->systemAlarmState()};
+  if (only_on_change && flags == flags_logged_)
+  {
+    return;
+  }
+  flags_logged_ = flags;
+  RCLCPP_INFO(
+    get_logger(), "%s. motion=0x%X [%s] safety=0x%X [%s] button=0x%X [%s] hw=0x%X [%s] alarm=0x%X",
+    event, flags[0], motion_flags_to_string(flags[0]).c_str(), flags[1],
+    flag_names(flags[1], SAFETY_NAMES).c_str(), flags[2],
+    flag_names(flags[2], BUTTON_NAMES).c_str(), flags[3], flag_names(flags[3], HW_NAMES).c_str(),
+    flags[4]);
+}
 
 // Returns the tripped flags as text, or nothing if no flag is tripped.
 // With UNCLEARABLE, the motion and alarm flags that clean_alarms() can clear are not tested.
@@ -682,14 +696,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   rcv_iface_->fetchData();
 
-  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
-  if (motion_flags_curr != motion_flags_prev_)
-  {
-    RCLCPP_INFO(
-      get_logger(), "Motion state: %s -> %s", motion_flags_to_string(motion_flags_prev_).c_str(),
-      motion_flags_to_string(motion_flags_curr).c_str());
-    motion_flags_prev_ = motion_flags_curr;
-  }
+  log_flags("Flags changed", true);
 
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
