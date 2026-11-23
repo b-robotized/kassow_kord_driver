@@ -556,16 +556,19 @@ constexpr FlagName BUTTON_NAMES[] = {
   {KassowKordHardwareInterface::BUTTONS_FLAG_TEACH, "TEACH"}};
 
 constexpr FlagName HW_NAMES[] = {
-  {KassowKordHardwareInterface::HW_FLAG_RUID_MISMATCH, "RUID_MISMATCH"},
-  {KassowKordHardwareInterface::HW_FLAG_HARD_FAULT, "HARD_FAULT"},
-  {KassowKordHardwareInterface::HW_FLAG_DISCOVERY_FAILED, "DISCOVERY_FAILED"},
-  {KassowKordHardwareInterface::HW_FLAG_ERROR_BITS_SET, "ERROR_BITS_SET"},
-  {KassowKordHardwareInterface::HW_FLAG_DEVICE_DISABLED, "DEVICE_DISABLED"},
-  {KassowKordHardwareInterface::HW_FLAG_LOW_VOLTAGE, "LOW_VOLTAGE"},
-  {KassowKordHardwareInterface::HW_FLAG_IOB_INIT_TIMEOUT, "IOB_INIT_TIMEOUT"},
-  {KassowKordHardwareInterface::HW_FLAG_SYNC_INIT_TIMEOUT, "SYNC_INIT_TIMEOUT"},
-  {KassowKordHardwareInterface::HW_FLAG_IOB_ESTOP_STALL, "IOB_ESTOP_STALL"},
-  {KassowKordHardwareInterface::HW_FLAG_IOB_PSTOP_STALL, "IOB_PSTOP_STALL"}};
+  {KassowKordHardwareInterface::HW_STAT_LOW_VOLTAGE_AFTER_RELAY_DETECTED,
+   "STAT_LOW_VOLTAGE_AFTER_RELAY_DETECTED"},
+  {KassowKordHardwareInterface::HW_STAT_INIT_BLOCKED, "STAT_INIT_BLOCKED"},
+  {KassowKordHardwareInterface::HW_STAT_INIT_RUID_MISMATCH, "STAT_INIT_RUID_MISMATCH"},
+  {KassowKordHardwareInterface::HW_STAT_HARD_FAULT, "STAT_HARD_FAULT"},
+  {KassowKordHardwareInterface::HW_STATUS_DISCOVERY_FAILED, "STATUS_DISCOVERY_FAILED"},
+  {KassowKordHardwareInterface::HW_STATUS_ERROR_BITS_SET, "STATUS_ERROR_BITS_SET"},
+  {KassowKordHardwareInterface::HW_STATUS_DEVICE_DISABLED, "STATUS_DEVICE_DISABLED"},
+  {KassowKordHardwareInterface::HW_STATUS_LOW_VOLTAGE, "STATUS_LOW_VOLTAGE"},
+  {KassowKordHardwareInterface::HW_STATUS_IOB_INIT_TIMEOUT, "STATUS_IOB_INIT_TIMEOUT"},
+  {KassowKordHardwareInterface::HW_STATUS_SYNC_INIT_TIMEOUT, "STATUS_SYNC_INIT_TIMEOUT"},
+  {KassowKordHardwareInterface::HW_STATUS_IOB_ESTOP_STALL, "STATUS_IOB_ESTOP_STALL"},
+  {KassowKordHardwareInterface::HW_STATUS_IOB_PSTOP_STALL, "STATUS_IOB_PSTOP_STALL"}};
 
 template <size_t N>
 std::string flag_names(unsigned int flags, const FlagName (&table)[N])
@@ -804,8 +807,8 @@ void KassowKordHardwareInterface::process_ros_services()
   if (state == KordServiceState::REQUESTED)
   {
     const unsigned int flags = rcv_iface_->getMotionFlags();
-    const bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
-    const bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
+    const bool is_standby = (flags & EMotionFlags::MOTION_FLAG_STANDBY) != 0;
+    const bool is_init = (flags & EMotionFlags::MOTION_FLAG_INIT) != 0;
     const double max_v = get_max_joint_velocity();
     const double VELOCITY_THRESHOLD = 1e-4;
 
@@ -942,20 +945,20 @@ bool KassowKordHardwareInterface::clean_alarms()
     RCLCPP_INFO(get_logger(), "Motion flags: %d", motion_flags);
     RCLCPP_INFO(get_logger(), "Robot safety flags: %d", safety_flags);
 
-    if (safety_flags & SafetyFlags::SAFETY_FLAG_USER_CONF_REQ)
+    if (safety_flags & ESafetyFlags::SAFETY_FLAG_USER_CONF_REQ)
     {
       RCLCPP_ERROR(get_logger(), "Errors cannot be cleared. User confirmation required.");
     }
 
-    const bool is_halt = motion_flags & MotionFlags::MOTION_FLAG_HALT;
-    const bool is_pstop = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
+    const bool is_halt = motion_flags & EMotionFlags::MOTION_FLAG_HALT;
+    const bool is_pstop = safety_flags & ESafetyFlags::SAFETY_FLAG_PSTOP;
 
     if (is_halt && is_pstop)
     {
       RCLCPP_ERROR(get_logger(), "Halt Error.");
     }
 
-    if (motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED)
+    if (motion_flags & EMotionFlags::MOTION_FLAG_SUSPENDED)
     {
       RCLCPP_ERROR(get_logger(), "Suspend Error.");
     }
