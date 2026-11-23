@@ -579,7 +579,15 @@ std::string flag_names(unsigned int flags, const FlagName (&table)[N])
     if (flags & bit)
     {
       names += std::string(name) + " ";
+      flags &= ~bit;
     }
+  }
+  // Bits that kord-api does not document.
+  if (flags != 0)
+  {
+    char unknown[24];
+    std::snprintf(unknown, sizeof(unknown), "UNKNOWN 0x%X ", flags);
+    names += unknown;
   }
   return names;
 }
