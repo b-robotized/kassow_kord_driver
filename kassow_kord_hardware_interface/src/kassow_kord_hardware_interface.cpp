@@ -665,8 +665,8 @@ std::optional<std::string> KassowKordHardwareInterface::find_tripped_flags(FlagS
   }
   char all[128];
   std::snprintf(
-    all, sizeof(all), "Flags: motion=0x%X safety=0x%X button=0x%X hw=0x%X alarm=0x%X",
-    motion_flags, safety_flags, button_flags, hw_flags, alarm_state);
+    all, sizeof(all), "Flags: motion=0x%X safety=0x%X button=0x%X hw=0x%X alarm=0x%X", motion_flags,
+    safety_flags, button_flags, hw_flags, alarm_state);
   return msg + all;
 }
 
@@ -960,7 +960,9 @@ bool KassowKordHardwareInterface::clean_alarms()
       RCLCPP_ERROR(get_logger(), "Suspend Error.");
     }
 
-    bool is_cbun = rcv_iface_->systemAlarmState() & kr2::kord::protocol::CAT_CBUN_EVENT;
+    // The alarm category is a number in bits 0-3, not a bit flag.
+    const uint32_t alarm_state = rcv_iface_->systemAlarmState();
+    bool is_cbun = (alarm_state & 0x0F) == CAT_CBUN_EVENT;
 
     // Check for KORD event
     const auto system_events = rcv_iface_->getSystemEvents();
@@ -975,7 +977,7 @@ bool KassowKordHardwareInterface::clean_alarms()
 
     if (is_cbun)
     {
-      RCLCPP_ERROR(get_logger(), "CBun Error.");
+      RCLCPP_WARN(get_logger(), "CBun or KORD event. Alarm: 0x%X. Clearing it.", alarm_state);
     }
   }
 
