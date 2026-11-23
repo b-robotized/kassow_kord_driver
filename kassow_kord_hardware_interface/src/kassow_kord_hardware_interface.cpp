@@ -591,6 +591,24 @@ std::string flag_names(unsigned int flags, const FlagName (&table)[N])
   }
   return names;
 }
+
+constexpr const char * CATEGORY_NAMES[] = {
+  "NONE", "SAFETY_EVENT", "SOFT_STOP_EVENT", "HW_STAT", "CBUN_EVENT"};
+
+constexpr FlagName CONTEXT_NAMES[] = {
+  {KassowKordHardwareInterface::CNTXT_ESTOP, "ESTOP"},
+  {KassowKordHardwareInterface::CNTXT_PSTOP, "PSTOP"},
+  {KassowKordHardwareInterface::CNTXT_SSTOP, "SSTOP"},
+  {KassowKordHardwareInterface::CNTXT_SYSERR, "SYSERR"}};
+
+// The category is a number in bits 0-3. The context is a set of flags in bits 4-7.
+std::string alarm_names(uint32_t alarm)
+{
+  const uint32_t category = alarm & 0x0F;
+  const std::string name =
+    category < std::size(CATEGORY_NAMES) ? CATEGORY_NAMES[category] : "UNKNOWN_CATEGORY";
+  return name + " " + flag_names((alarm >> 4) & 0x0F, CONTEXT_NAMES);
+}
 }  // namespace
 
 // Logs all status flags. With only_on_change, it logs only if a flag changed since the last log.
@@ -605,11 +623,12 @@ void KassowKordHardwareInterface::log_flags(const char * event, bool only_on_cha
   }
   flags_logged_ = flags;
   RCLCPP_INFO(
-    get_logger(), "%s. motion=0x%X [%s] safety=0x%X [%s] button=0x%X [%s] hw=0x%X [%s] alarm=0x%X",
-    event, flags[0], motion_flags_to_string(flags[0]).c_str(), flags[1],
+    get_logger(),
+    "%s. motion=0x%X [%s] safety=0x%X [%s] button=0x%X [%s] hw=0x%X [%s] alarm=0x%X [%s]", event,
+    flags[0], motion_flags_to_string(flags[0]).c_str(), flags[1],
     flag_names(flags[1], SAFETY_NAMES).c_str(), flags[2],
     flag_names(flags[2], BUTTON_NAMES).c_str(), flags[3], flag_names(flags[3], HW_NAMES).c_str(),
-    flags[4]);
+    flags[4], alarm_names(flags[4]).c_str());
 }
 
 // Returns the tripped flags as text, or nothing if no flag is tripped.
@@ -654,19 +673,9 @@ std::optional<std::string> KassowKordHardwareInterface::find_tripped_flags(FlagS
     const unsigned int motion_tripped = motion_flags & ~ALLOWED_MOTION_FLAGS;
     add("Motion", motion_tripped, motion_flags_to_string(motion_tripped));
 
-    // The alarm state packs the category in bits 0-3 and the context in bits 4-7.
-    std::string alarm_names;
-    if (((alarm_state >> 4) & 0x0F) == CNTXT_ESTOP)
+    if (((alarm_state >> 4) & 0x0F) == CNTXT_ESTOP || (alarm_state & 0x0F) == CAT_SAFETY_EVENT)
     {
-      alarm_names += "CNTXT_ESTOP ";
-    }
-    if ((alarm_state & 0x0F) == CAT_SAFETY_EVENT)
-    {
-      alarm_names += "CAT_SAFETY_EVENT ";
-    }
-    if (!alarm_names.empty())
-    {
-      add("Alarm", alarm_state, alarm_names);
+      add("Alarm", alarm_state, alarm_names(alarm_state));
     }
   }
 
