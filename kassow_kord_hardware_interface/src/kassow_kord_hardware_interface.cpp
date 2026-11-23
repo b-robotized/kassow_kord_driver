@@ -1033,7 +1033,14 @@ bool KassowKordHardwareInterface::clean_alarms()
     auto status = rcv_iface_->getCommandStatus(token);
     if (status != -1)
     {
-      RCLCPP_INFO(get_logger(), "%s command status: %d", name.c_str(), static_cast<int>(status));
+      // kord-api 3.0.2 ECommandStatusFlags, by value.
+      constexpr const char * STATUS_NAMES[] = {"ACCEPTED",     "CBUN_ERROR",       "RC_API_ERROR",
+                                               "CRC_MISMATCH", "COMMANDS_OVERLAP", "LOST"};
+      RCLCPP_INFO(
+        get_logger(), "%s command status: %s (%d)", name.c_str(),
+        status >= 0 && status < static_cast<int>(std::size(STATUS_NAMES)) ? STATUS_NAMES[status]
+                                                                          : "UNKNOWN",
+        static_cast<int>(status));
     }
     else
     {
