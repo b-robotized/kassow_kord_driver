@@ -218,6 +218,9 @@ private:
   std::array<unsigned int, 5> flags_logged_{~0u, ~0u, ~0u, ~0u, ~0u};
   bool skip_jcontrol_ = false;
 
+  // Logs the status flags and the alarm clearing at INFO level.
+  bool logging_verbose_ = true;
+
   // Set at the first tripped flag and cleared in on_activate(). The async worker can overwrite a
   // DEACTIVATE result before the controller manager reads it, so write() returns it again.
   bool deactivate_latched_ = false;

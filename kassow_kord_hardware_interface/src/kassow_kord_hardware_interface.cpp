@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "hardware_interface/lexical_casts.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -28,6 +29,7 @@
  *   - port (int, required): Port number for Kord connection.
  *   - session_id (int, required): Kord session ID.
  *   - waitSync_timeout_ms (int, required): Kord session ID.
+ *   - logging_verbose (bool, optional, default true): Log the status flags and the alarm clearing.
  */
 namespace kassow_kord_hardware_interface
 {
@@ -171,6 +173,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     RCLCPP_FATAL(get_logger(), "Parameter 'waitSync_timeout_ms' is required but not provided");
     return hardware_interface::CallbackReturn::ERROR;
   }
+
+  logging_verbose_ = hw_params.find("logging_verbose") == hw_params.end() ||
+                     hardware_interface::parse_bool(hw_params.at("logging_verbose"));
 
   if (info_.joints.size() != KORD_JOINT_COUNT)
   {
@@ -520,7 +525,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
       set_command(digital_outputs_itfs_[i], value);
     }
   }
-  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", digital_outputs_sent_);
+  RCLCPP_INFO_EXPRESSION(
+    get_logger(), logging_verbose_, "Initial digital output state: 0x%016lX",
+    digital_outputs_sent_);
 
   skip_jcontrol_ = false;
   if (ros_services_)
@@ -622,8 +629,8 @@ void KassowKordHardwareInterface::log_flags(const char * event, bool only_on_cha
     return;
   }
   flags_logged_ = flags;
-  RCLCPP_INFO(
-    get_logger(),
+  RCLCPP_INFO_EXPRESSION(
+    get_logger(), logging_verbose_,
     "%s. motion=0x%X [%s] safety=0x%X [%s] button=0x%X [%s] hw=0x%X [%s] alarm=0x%X [%s]", event,
     flags[0], motion_flags_to_string(flags[0]).c_str(), flags[1],
     flag_names(flags[1], SAFETY_NAMES).c_str(), flags[2],
@@ -956,11 +963,11 @@ bool KassowKordHardwareInterface::clean_alarms()
     // If nothing to clear, early exit
     if (motion_flags == 0 && safety_flags == 0)
     {
-      RCLCPP_INFO(get_logger(), "No errors.");
+      RCLCPP_INFO_EXPRESSION(get_logger(), logging_verbose_, "No errors.");
     }
 
-    RCLCPP_INFO(get_logger(), "Motion flags: %d", motion_flags);
-    RCLCPP_INFO(get_logger(), "Robot safety flags: %d", safety_flags);
+    RCLCPP_INFO_EXPRESSION(get_logger(), logging_verbose_, "Motion flags: %d", motion_flags);
+    RCLCPP_INFO_EXPRESSION(get_logger(), logging_verbose_, "Robot safety flags: %d", safety_flags);
 
     if (safety_flags & ESafetyFlags::SAFETY_FLAG_USER_CONF_REQ)
     {
@@ -1014,8 +1021,9 @@ bool KassowKordHardwareInterface::clean_alarms()
     const auto & name = kv.second;
     int64_t token = ctl_iface_->clearAlarmRequest(command);
 
-    RCLCPP_INFO(
-      get_logger(), "%s command sent with token: %ld", name.c_str(), static_cast<int64_t>(token));
+    RCLCPP_INFO_EXPRESSION(
+      get_logger(), logging_verbose_, "%s command sent with token: %ld", name.c_str(),
+      static_cast<int64_t>(token));
 
     // Poll for command status -- blocking
     while (rcv_iface_->getCommandStatus(token) == -1)
@@ -1036,8 +1044,8 @@ bool KassowKordHardwareInterface::clean_alarms()
       // kord-api 3.0.2 ECommandStatusFlags, by value.
       constexpr const char * STATUS_NAMES[] = {"ACCEPTED",     "CBUN_ERROR",       "RC_API_ERROR",
                                                "CRC_MISMATCH", "COMMANDS_OVERLAP", "LOST"};
-      RCLCPP_INFO(
-        get_logger(), "%s command status: %s (%d)", name.c_str(),
+      RCLCPP_INFO_EXPRESSION(
+        get_logger(), logging_verbose_, "%s command status: %s (%d)", name.c_str(),
         status >= 0 && status < static_cast<int>(std::size(STATUS_NAMES)) ? STATUS_NAMES[status]
                                                                           : "UNKNOWN",
         static_cast<int>(status));
