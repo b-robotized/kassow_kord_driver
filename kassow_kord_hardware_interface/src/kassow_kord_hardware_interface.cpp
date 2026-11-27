@@ -489,6 +489,9 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
   rcv_iface_->fetchData();
   log_flags("Alarms cleared", false);
 
+  limit_torque_lower_.fill(std::numeric_limits<double>::quiet_NaN());
+  log_effective_limits_on_change();
+
   // Refuse to activate if the robot is not in an allowed state after the alarms are cleared.
   if (const auto tripped = find_tripped_flags(FlagScope::ALL))
   {
@@ -765,6 +768,7 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   read_digital_io();
   update_digital_output_request();
+  log_effective_limits_on_change();
 
   if (rcv_iface_->systemAlarmState())
   {
@@ -774,6 +778,37 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   process_ros_services();
   return hardware_interface::return_type::OK;
+}
+
+void KassowKordHardwareInterface::log_effective_limits_on_change()
+{
+  const auto lower = rcv_iface_->getEffectiveLimitTorqueLower();
+  const auto upper = rcv_iface_->getEffectiveLimitTorqueUpper();
+  const auto speed = rcv_iface_->getEffectiveLimitJointSpeed();
+  if (lower == limit_torque_lower_ && upper == limit_torque_upper_ && speed == limit_joint_speed_)
+  {
+    return;
+  }
+  limit_torque_lower_ = lower;
+  limit_torque_upper_ = upper;
+  limit_joint_speed_ = speed;
+
+  const auto to_string = [](const std::array<double, KORD_JOINT_COUNT> & values)
+  {
+    std::string s;
+    char buf[16];
+    for (const double v : values)
+    {
+      std::snprintf(buf, sizeof(buf), " %.2f", v);
+      s += buf;
+    }
+    return s;
+  };
+  // Throttled: KORD can change the limits with the joint speed.
+  RCLCPP_INFO_THROTTLE(
+    get_logger(), *get_clock(), 1000,
+    "Effective limits: torque lower [Nm]:%s | torque upper [Nm]:%s | joint speed [rad/s]:%s",
+    to_string(lower).c_str(), to_string(upper).c_str(), to_string(speed).c_str());
 }
 
 void KassowKordHardwareInterface::read_digital_io()

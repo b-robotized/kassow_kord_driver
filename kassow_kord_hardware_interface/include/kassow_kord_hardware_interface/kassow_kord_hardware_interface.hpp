@@ -171,6 +171,7 @@ private:
   void update_digital_output_request();
   void process_ros_services();
   void write_digital_outputs();
+  void log_effective_limits_on_change();
   // bool is_robot_stationary() const;
   double get_max_joint_velocity() const;
   std::string motion_flags_to_string(unsigned int flags) const;
@@ -195,6 +196,11 @@ private:
   std::array<double, KORD_JOINT_COUNT> position_cmds{};
   std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
+
+  // Last effective limits from KORD. The torque lower limits are NaN until the first read.
+  std::array<double, KORD_JOINT_COUNT> limit_torque_lower_;
+  std::array<double, KORD_JOINT_COUNT> limit_torque_upper_;
+  std::array<double, KORD_JOINT_COUNT> limit_joint_speed_;
 
   std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
   std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
