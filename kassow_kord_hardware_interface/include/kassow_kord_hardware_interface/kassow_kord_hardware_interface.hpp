@@ -15,6 +15,7 @@
 
 #include <kord/api/kord.h>
 #include <kord/api/kord_control_interface.h>
+#include <kord/api/kord_io_request.h>
 #include <kord/api/kord_receive_interface.h>
 #include <kord/utils/utils.h>
 #include <kord/version.h>
@@ -34,9 +35,16 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
+#include "kassow_kord_hardware_interface/kassow_ros_services.hpp"
+#include "kassow_kord_hardware_interface/kord_services.hpp"
+
 namespace kassow_kord_hardware_interface
 {
 const size_t KORD_JOINT_COUNT = 7;
+const size_t KORD_INPUT_COUNT = 16;
+const size_t KORD_OUTPUT_COUNT = 16;
+// TCP pose: position x, y, z and orientation quaternion x, y, z, w
+const size_t KORD_TCP_POSE_SIZE = 7;
 
 class KassowKordHardwareInterface : public hardware_interface::SystemInterface
 {
@@ -56,6 +64,12 @@ public:
     const rclcpp_lifecycle::State & previous_state) override;
 
   hardware_interface::CallbackReturn on_deactivate(
+    const rclcpp_lifecycle::State & previous_state) override;
+
+  hardware_interface::CallbackReturn on_error(
+    const rclcpp_lifecycle::State & previous_state) override;
+
+  hardware_interface::CallbackReturn on_shutdown(
     const rclcpp_lifecycle::State & previous_state) override;
 
   hardware_interface::return_type read(
@@ -91,8 +105,55 @@ public:
     SAFETY_FLAG_USER_CONF_REQ = 16
   };
 
+  enum ButtonFlags : unsigned int
+  {
+    BUTTONS_FLAG_ESTOP = 0x01,
+    BUTTONS_FLAG_PSTOP = 0x02,
+    BUTTONS_FLAG_TOGGLE = 0x04,
+    BUTTONS_FLAG_BACKDRIVE = 0x08,
+    BUTTONS_FLAG_TEACH = 0x10
+  };
+
+  enum HWFlags : unsigned int
+  {
+    HW_FLAG_RUID_MISMATCH = 0x0004,
+    HW_FLAG_HARD_FAULT = 0x0008,
+    HW_FLAG_DISCOVERY_FAILED = 0x0100,
+    HW_FLAG_ERROR_BITS_SET = 0x0200,
+    HW_FLAG_DEVICE_DISABLED = 0x0400,
+    HW_FLAG_LOW_VOLTAGE = 0x0800,
+    HW_FLAG_IOB_INIT_TIMEOUT = 0x1000,
+    HW_FLAG_SYNC_INIT_TIMEOUT = 0x2000,
+    HW_FLAG_IOB_ESTOP_STALL = 0x4000,
+    HW_FLAG_IOB_PSTOP_STALL = 0x8000
+  };
+
+  enum SystemAlarmCategory : unsigned int
+  {
+    CAT_SAFETY_EVENT = 0x01,
+    CAT_SOFT_STOP_EVENT = 0x02,
+    CAT_HW_STAT = 0x03,
+    CAT_CBUN_EVENT = 0x04
+  };
+
+  enum SystemAlarmContext : unsigned int
+  {
+    CNTXT_ESTOP = 0x01,
+    CNTXT_PSTOP = 0x02,
+    CNTXT_SSTOP = 0x04,
+    CNTXT_SYSERR = 0x08
+  };
+
 private:
+  bool check_and_log_safety_violations();
   bool clean_alarms();
+  void read_digital_io();
+  void update_digital_output_request();
+  void process_ros_services();
+  void write_digital_outputs();
+  // bool is_robot_stationary() const;
+  double get_max_joint_velocity() const;
+  std::string motion_flags_to_string(unsigned int flags) const;
 
   std::shared_ptr<kr2::kord::KordCore> kord_;
   std::unique_ptr<kr2::kord::ControlInterface> ctl_iface_;
@@ -112,10 +173,29 @@ private:
   std::array<double, KORD_JOINT_COUNT> velocity_cmds{};
   std::array<double, KORD_JOINT_COUNT> acceleration_cmds{};
 
+  std::array<std::string, KORD_INPUT_COUNT> digital_inputs_itfs_;
+  std::array<std::string, KORD_OUTPUT_COUNT> digital_outputs_itfs_;
+
+  // TCP pose state interfaces. Empty if the description has no TCP pose sensor.
+  std::array<std::string, KORD_TCP_POSE_SIZE> tcp_pose_itfs_;
+  bool has_tcp_pose_ = false;
+
+  // Digital outputs: bitfield of the outputs confirmed by KORD, and the request in progress.
+  uint64_t digital_outputs_sent_ = 0;
+  KordDigitalOutputService digital_output_service_;
+
   std::string ip_address;
   int session_id;
   int port;
   int waitSync_timeout_ms;
+
+  // ROS services in their own NRT thread. Created in on_configure, stopped in on_shutdown.
+  std::unique_ptr<KassowRosServices> ros_services_;
+  size_t update_rate_ = 500;
+
+  // Testing, to be removed:
+  unsigned int motion_flags_prev_ = 0xFFFFFFFF;
+  bool skip_jcontrol_ = false;
 };
 
 }  // namespace kassow_kord_hardware_interface

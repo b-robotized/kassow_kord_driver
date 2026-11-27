@@ -2,13 +2,13 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="kassow_kord">
 
   <xacro:arg name="use_mock_hardware" default="true"/>
-  
+
   <xacro:arg name="robot_1_model" default="kr810"/>
   <xacro:arg name="robot_1_prefix" default="kassow_right"/>
   <xacro:arg name="robot_1_ip" default="10.23.23.204"/>
   <xacro:arg name="robot_1_port" default="28283"/>
   <xacro:arg name="robot_1_session_id" default="1"/>
-  
+
   <xacro:arg name="robot_2_model" default="kr810"/>
   <xacro:arg name="robot_2_prefix" default="kassow_left"/>
   <xacro:arg name="robot_2_ip" default="10.23.23.205"/>

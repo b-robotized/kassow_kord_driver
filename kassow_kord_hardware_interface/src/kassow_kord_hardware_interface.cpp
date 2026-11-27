@@ -12,7 +12,11 @@
 
 #include "kassow_kord_hardware_interface/kassow_kord_hardware_interface.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "kassow_kord_hardware_interface/bit_helpers.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 /**
@@ -26,6 +30,94 @@
  */
 namespace kassow_kord_hardware_interface
 {
+
+std::string KassowKordHardwareInterface::motion_flags_to_string(unsigned int flags) const
+{
+  std::string s = "";
+  if (flags & MOTION_FLAG_STANDBY)
+  {
+    s += "STANDBY ";
+  }
+  if (flags & MOTION_FLAG_TRACKING)
+  {
+    s += "TRACKING ";
+  }
+  if (flags & MOTION_FLAG_TERMINATED)
+  {
+    s += "TERMINATED ";
+  }
+  if (flags & MOTION_FLAG_HALT)
+  {
+    s += "HALT ";
+  }
+  if (flags & MOTION_FLAG_SYNC)
+  {
+    s += "SYNC ";
+  }
+  if (flags & MOTION_FLAG_SUSPENDED)
+  {
+    s += "SUSPENDED ";
+  }
+  if (flags & MOTION_FLAG_OFFLINE)
+  {
+    s += "OFFLINE ";
+  }
+  if (flags & MOTION_FLAG_INIT)
+  {
+    s += "INIT ";
+  }
+  if (flags & MOTION_FLAG_REINIT)
+  {
+    s += "REINIT ";
+  }
+  if (flags & MOTION_FLAG_BACKDRIVE)
+  {
+    s += "BACKDRIVE ";
+  }
+  if (flags & MOTION_FLAG_PAUSED)
+  {
+    s += "PAUSED ";
+  }
+  if (flags & MOTION_FLAG_MAINTENANCE)
+  {
+    s += "MAINTENANCE ";
+  }
+  if (flags & MOTION_FLAG_VELOCITYCTL)
+  {
+    s += "VELOCITYCTL ";
+  }
+  if (flags & MOTION_FLAG_ARTOACTIVE)
+  {
+    s += "ARTOACTIVE ";
+  }
+  return s.empty() ? "NONE" : s;
+}
+
+// bool KassowKordHardwareInterface::is_robot_stationary() const
+// {
+//   const double VELOCITY_THRESHOLD = 1e-4; // Adjust epsilon based on sensor noise
+//   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i) {
+//     if (std::abs(velocity_states[i]) > VELOCITY_THRESHOLD) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
+
+double KassowKordHardwareInterface::get_max_joint_velocity() const
+{
+  double max_vel = 0.0;
+  for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
+  {
+    double v = std::abs(velocity_states[i]);
+    if (v > max_vel)
+    {
+      max_vel = v;
+    }
+  }
+  return max_vel;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   const hardware_interface::HardwareComponentInterfaceParams & params)
 {
@@ -172,6 +264,106 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
     joint_index++;
   }
 
+  //  Populate the GPIO interfaces vectors
+  size_t bit_index;
+  std::string io_type;
+  RCLCPP_INFO(get_logger(), "Found %zu GPIO component(s) in hardware info", info_.gpios.size());
+  for (const hardware_interface::ComponentInfo & gpio : info_.gpios)
+  {
+    RCLCPP_INFO(
+      get_logger(), "GPIO component: '%s' — %zu state interface(s)", gpio.name.c_str(),
+      gpio.state_interfaces.size());
+    for (const auto & state_io : gpio.state_interfaces)
+    {
+      RCLCPP_INFO(get_logger(), "  state_interface name: '%s'", state_io.name.c_str());
+      if (state_io.parameters.count("bit_index"))
+      {
+        bit_index = stoi(state_io.parameters.at("bit_index"));
+        RCLCPP_INFO(get_logger(), "  bit_index: %zu", bit_index);
+
+        if (state_io.parameters.count("io_type"))
+        {
+          io_type = state_io.parameters.at("io_type");
+          RCLCPP_INFO(get_logger(), "  io_type: '%s'", io_type.c_str());
+          if (io_type == "input")
+          {
+            if (bit_index >= KORD_INPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for input (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_INPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_inputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for input %lu is: %s", bit_index,
+              digital_inputs_itfs_[bit_index].c_str());
+          }
+          else if (io_type == "output")
+          {
+            if (bit_index >= KORD_OUTPUT_COUNT)
+            {
+              RCLCPP_ERROR(
+                get_logger(),
+                "state_interface '%s' has out-of-range bit_index %zu for output (max %zu)",
+                state_io.name.c_str(), bit_index, KORD_OUTPUT_COUNT - 1);
+              return hardware_interface::CallbackReturn::ERROR;
+            }
+            digital_outputs_itfs_[bit_index] = gpio.name + "/" + state_io.name;
+            RCLCPP_INFO(
+              get_logger(), "Current gpio state interface for output %lu is: %s", bit_index,
+              digital_outputs_itfs_[bit_index].c_str());
+          }
+          else
+          {
+            RCLCPP_ERROR(
+              get_logger(), "Unknown io_type for state_interface '%s'", state_io.name.c_str());
+            return hardware_interface::CallbackReturn::ERROR;
+          }
+        }
+        else
+        {
+          RCLCPP_ERROR(
+            get_logger(), "state_interface '%s' is missing required parameter 'io_type'",
+            state_io.name.c_str());
+          return hardware_interface::CallbackReturn::ERROR;
+        }
+      }
+      else
+      {
+        RCLCPP_ERROR(
+          get_logger(), "state_interface '%s' is missing required parameter 'bit_index'",
+          state_io.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+    }
+  }
+
+  // Optional TCP pose sensor, with the same interface names as in the UR driver
+  const std::array<std::string, KORD_TCP_POSE_SIZE> tcp_pose_names = {
+    "position.x",    "position.y",    "position.z",   "orientation.x",
+    "orientation.y", "orientation.z", "orientation.w"};
+  for (const hardware_interface::ComponentInfo & sensor : info_.sensors)
+  {
+    for (size_t i = 0; i < KORD_TCP_POSE_SIZE; ++i)
+    {
+      const bool found = std::any_of(
+        sensor.state_interfaces.begin(), sensor.state_interfaces.end(),
+        [&](const auto & itf) { return itf.name == tcp_pose_names[i]; });
+      if (!found)
+      {
+        RCLCPP_ERROR(
+          get_logger(), "Sensor '%s' has no state interface '%s'. Expected a TCP pose sensor.",
+          sensor.name.c_str(), tcp_pose_names[i].c_str());
+        return hardware_interface::CallbackReturn::ERROR;
+      }
+      tcp_pose_itfs_[i] = sensor.name + "/" + tcp_pose_names[i];
+    }
+    has_tcp_pose_ = true;
+    RCLCPP_INFO(get_logger(), "TCP pose is exported as sensor '%s'", sensor.name.c_str());
+  }
+
   kord_ = std::shared_ptr<kr2::kord::KordCore>(
     new kr2::kord::KordCore(ip_address, port, session_id, kr2::kord::UDP_CLIENT));
 
@@ -185,20 +377,51 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_error(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  // Called from the RT loop: pause the services thread, but do not join it.
+  if (ros_services_)
+  {
+    ros_services_->pause();
+  }
+  digital_output_service_.abort();
+  digital_output_service_.reset();
+  kord_->disconnect();
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_cleanup(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  RCLCPP_INFO(get_logger(), "cleanup KassowKordHardwareInterface...");
+  RCLCPP_INFO(get_logger(), "Cleaning up KassowKordHardwareInterface...");
 
   if (!clean_alarms())
   {
-    RCLCPP_DEBUG(
-      get_logger(), "clean_alarms() returned false during deactivate (continuing cleanup)");
+    RCLCPP_DEBUG(get_logger(), "clean_alarms() returned false during cleanup");
   }
 
+  if (ros_services_)
+  {
+    ros_services_->pause();
+  }
   kord_->disconnect();
 
   RCLCPP_INFO(get_logger(), "Successfully cleaned up");
+  return hardware_interface::CallbackReturn::SUCCESS;
+}
+
+hardware_interface::CallbackReturn KassowKordHardwareInterface::on_shutdown(
+  const rclcpp_lifecycle::State & /*previous_state*/)
+{
+  RCLCPP_INFO(get_logger(), "Shutting down KassowKordHardwareInterface...");
+  if (ros_services_)
+  {
+    ros_services_->stop();
+    ros_services_.reset();
+  }
+  kord_->disconnect();
+  RCLCPP_INFO(get_logger(), "Successfully shut down!");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -212,6 +435,14 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_configure(
   {
     RCLCPP_FATAL(get_logger(), "Failed to connect to Kassow Kord robot.");
     return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  // The services thread is created once and runs until on_shutdown. It starts paused.
+  if (!ros_services_)
+  {
+    update_rate_ = info_.rw_rate > 0 ? info_.rw_rate : update_rate_;
+    ros_services_ = std::make_unique<KassowRosServices>(info_.name + "_services", update_rate_);
+    ros_services_->start();
   }
 
   RCLCPP_INFO(get_logger(), "KassowKordHardwareInterface configured and connected");
@@ -238,6 +469,16 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
 
   // Read initial joint positions and set them as the initial command values
   rcv_iface_->fetchData();
+
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_)
+  {
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str());
+    motion_flags_prev_ = motion_flags_curr;
+  }
+
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
   velocity_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QD);
   acceleration_states =
@@ -255,14 +496,152 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_activate(
     set_command(joint_velocity_itfs_[i], velocity_states[i]);
     set_command(joint_acceleration_itfs_[i], acceleration_states[i]);
   }
+
+  // Read the current outputs and use them as the initial output commands
+  digital_outputs_sent_ = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
+  digital_output_service_.reset();
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (!digital_outputs_itfs_[i].empty())
+    {
+      const double value =
+        bit_helpers::bit_to_double(bit_helpers::is_set(digital_outputs_sent_, i));
+      set_state(digital_outputs_itfs_[i], value);
+      set_command(digital_outputs_itfs_[i], value);
+    }
+  }
+  RCLCPP_INFO(get_logger(), "Initial digital output state: 0x%016lX", digital_outputs_sent_);
+
+  skip_jcontrol_ = false;
+  if (ros_services_)
+  {
+    ros_services_->resume();
+  }
+
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+bool KassowKordHardwareInterface::check_and_log_safety_violations()
+{
+  // 1. Fetch current status flags
+  unsigned int motion_flags = rcv_iface_->getMotionFlags();
+  unsigned int safety_flags = rcv_iface_->getRobotSafetyFlags();
+  unsigned int button_flags = rcv_iface_->getButtonFlags();
+  unsigned int hw_flags = rcv_iface_->getHWFlags();
+  uint32_t alarm_state = rcv_iface_->systemAlarmState();
+
+  if (ros_services_)
+  {
+    ros_services_->robot_state().motion_flags.store(motion_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().safety_flags.store(safety_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().button_flags.store(button_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().hw_flags.store(hw_flags, std::memory_order_relaxed);
+    ros_services_->robot_state().alarm_state.store(alarm_state, std::memory_order_relaxed);
+  }
+
+  // 2. Evaluate individual triggers using the local enums
+  bool m_halt = motion_flags & MotionFlags::MOTION_FLAG_HALT;
+  bool m_susp = motion_flags & MotionFlags::MOTION_FLAG_SUSPENDED;
+  bool s_estop = safety_flags & SafetyFlags::SAFETY_FLAG_ESTOP;
+  bool s_pstop = safety_flags & SafetyFlags::SAFETY_FLAG_PSTOP;
+
+  bool b_estop = button_flags & ButtonFlags::BUTTONS_FLAG_ESTOP;
+  bool hw_estop = hw_flags & HWFlags::HW_FLAG_IOB_ESTOP_STALL;
+
+  // Extract packed Category (bits 0-3) and Context (bits 4-7)
+  uint8_t current_cat = alarm_state & 0x0F;
+  uint8_t current_cntxt = (alarm_state >> 4) & 0x0F;
+
+  bool a_ctx_estop = (current_cntxt == SystemAlarmContext::CNTXT_ESTOP);
+  bool a_cat_safety = (current_cat == SystemAlarmCategory::CAT_SAFETY_EVENT);
+
+  // 3. Trigger condition and format comprehensive log
+  if (m_halt || m_susp || s_estop || s_pstop || b_estop || hw_estop || a_ctx_estop || a_cat_safety)
+  {
+    std::string log_msg = "Deactivating. FLags: ";
+
+    if (m_halt || m_susp)
+    {
+      log_msg += "Motion: ";
+      if (m_halt)
+      {
+        log_msg += "HALT";
+      }
+      if (m_halt && m_susp)
+      {
+        log_msg += ", ";
+      }
+      if (m_susp)
+      {
+        log_msg += "SUSPENDED";
+      }
+      log_msg += ". ";
+    }
+
+    if (s_estop || s_pstop)
+    {
+      log_msg += "SafetyFlags: ";
+      if (s_estop)
+      {
+        log_msg += "ESTOP";
+      }
+      if (s_estop && s_pstop)
+      {
+        log_msg += ", ";
+      }
+      if (s_pstop)
+      {
+        log_msg += "PSTOP";
+      }
+      log_msg += ". ";
+    }
+
+    if (b_estop)
+    {
+      log_msg += "ButtonFlags: ESTOP. ";
+    }
+    if (hw_estop)
+    {
+      log_msg += "HWFlags: IOB_ESTOP_STALL. ";
+    }
+
+    if (a_ctx_estop || a_cat_safety)
+    {
+      log_msg += "SystemAlarm: ";
+      if (a_ctx_estop)
+      {
+        log_msg += "CNTXT_ESTOP";
+      }
+      if (a_ctx_estop && a_cat_safety)
+      {
+        log_msg += ", ";
+      }
+      if (a_cat_safety)
+      {
+        log_msg += "CAT_SAFETY_EVENT";
+      }
+      log_msg += ". ";
+    }
+
+    RCLCPP_ERROR(get_logger(), "%s", log_msg.c_str());
+    return true;  // Violation detected
+  }
+
+  return false;  // No violations
+}
+
 hardware_interface::CallbackReturn KassowKordHardwareInterface::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  if (ros_services_)
+  {
+    ros_services_->pause();
+  }
+  digital_output_service_.abort();
+  digital_output_service_.reset();
+
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
   return CallbackReturn::SUCCESS;
 }
@@ -279,10 +658,13 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
 
   rcv_iface_->fetchData();
 
-  if (rcv_iface_->systemAlarmState())
+  unsigned int motion_flags_curr = rcv_iface_->getMotionFlags();
+  if (motion_flags_curr != motion_flags_prev_)
   {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Alarm detected, deactivating...");
-    return hardware_interface::return_type::ERROR;
+    RCLCPP_INFO(
+      get_logger(), "Motion state: %s -> %s", motion_flags_to_string(motion_flags_prev_).c_str(),
+      motion_flags_to_string(motion_flags_curr).c_str());
+    motion_flags_prev_ = motion_flags_curr;
   }
 
   position_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
@@ -299,12 +681,139 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_effort_itfs_[i], torque_states[i]);
   }
 
+  if (has_tcp_pose_)
+  {
+    const auto tcp_pose = rcv_iface_->getTCPWithQuaternion();
+    for (size_t i = 0; i < KORD_TCP_POSE_SIZE; ++i)
+    {
+      set_state(tcp_pose_itfs_[i], tcp_pose[i]);
+    }
+  }
+
+  read_digital_io();
+  update_digital_output_request();
+
+  if (rcv_iface_->systemAlarmState())
+  {
+    // write() deactivates the hardware on safety violations
+    return hardware_interface::return_type::OK;
+  }
+
+  process_ros_services();
   return hardware_interface::return_type::OK;
+}
+
+void KassowKordHardwareInterface::read_digital_io()
+{
+  const auto digital_input = static_cast<uint64_t>(rcv_iface_->getDigitalInput());
+  for (size_t i = 0; i < KORD_INPUT_COUNT; ++i)
+  {
+    if (!digital_inputs_itfs_[i].empty())
+    {
+      set_state(
+        digital_inputs_itfs_[i], bit_helpers::bit_to_double(bit_helpers::is_set(digital_input, i)));
+    }
+  }
+
+  const auto digital_output = static_cast<uint64_t>(rcv_iface_->getDigitalOutput());
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (!digital_outputs_itfs_[i].empty())
+    {
+      set_state(
+        digital_outputs_itfs_[i],
+        bit_helpers::bit_to_double(bit_helpers::is_set(digital_output, i)));
+    }
+  }
+}
+
+// IO request: monitored with the request ID. directJControl is not paused.
+void KassowKordHardwareInterface::update_digital_output_request()
+{
+  if (digital_output_service_.get_state() == KordServiceState::DISPATCHED)
+  {
+    digital_output_service_.poll(*rcv_iface_);
+  }
+  if (!digital_output_service_.is_finished())
+  {
+    return;
+  }
+
+  const auto rid = digital_output_service_.get_request_rid();
+  switch (digital_output_service_.release())
+  {
+    case KordServiceState::SUCCESS:
+      digital_outputs_sent_ |= digital_output_service_.get_enable_mask();
+      digital_outputs_sent_ &= ~digital_output_service_.get_disable_mask();
+      RCLCPP_INFO(get_logger(), "Digital output request %ld finished.", rid);
+      break;
+    case KordServiceState::TIMEOUT:
+      RCLCPP_ERROR(get_logger(), "Digital output request %ld timed out.", rid);
+      break;
+    default:
+      RCLCPP_ERROR(get_logger(), "Digital output request %ld failed.", rid);
+      break;
+  }
+}
+
+void KassowKordHardwareInterface::process_ros_services()
+{
+  skip_jcontrol_ = false;
+  if (!ros_services_)
+  {
+    return;
+  }
+
+  // GetPayload: read from memory, updated by fetchData() in this cycle.
+  ros_services_->get_payload().serve(*rcv_iface_);
+
+  // SetLoad: monitored with the command token. directJControl is paused until it finishes.
+  auto & set_load = ros_services_->set_load();
+  const auto state = set_load.get_state();
+  if (state == KordServiceState::REQUESTED)
+  {
+    const unsigned int flags = rcv_iface_->getMotionFlags();
+    const bool is_standby = (flags & MotionFlags::MOTION_FLAG_STANDBY) != 0;
+    const bool is_init = (flags & MotionFlags::MOTION_FLAG_INIT) != 0;
+    const double max_v = get_max_joint_velocity();
+    const double VELOCITY_THRESHOLD = 1e-4;
+
+    if (max_v > VELOCITY_THRESHOLD)
+    {
+      RCLCPP_WARN(get_logger(), "SetLoad: robot is moving (max_vel: %e). Rejecting.", max_v);
+      set_load.abort();
+    }
+    else if (is_standby || is_init)
+    {
+      skip_jcontrol_ = true;
+      RCLCPP_INFO(
+        get_logger(), "SetLoad: dispatching. Motion flags: [%s]",
+        motion_flags_to_string(flags).c_str());
+      set_load.dispatch(*ctl_iface_);
+    }
+    else
+    {
+      skip_jcontrol_ = true;
+      RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), 500, "SetLoad: waiting for STANDBY. Motion flags: [%s]",
+        motion_flags_to_string(flags).c_str());
+    }
+  }
+  else if (state == KordServiceState::DISPATCHED)
+  {
+    skip_jcontrol_ = true;
+    set_load.poll(*rcv_iface_);
+  }
 }
 
 hardware_interface::return_type KassowKordHardwareInterface::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
+  if (check_and_log_safety_violations())
+  {
+    return hardware_interface::return_type::DEACTIVATE;
+  }
+
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
     position_cmds[i] = get_command(joint_position_itfs_[i]);
@@ -312,13 +821,67 @@ hardware_interface::return_type KassowKordHardwareInterface::write(
     acceleration_cmds[i] = get_command(joint_acceleration_itfs_[i]);
   }
 
-  if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
+  if (skip_jcontrol_)
+  {
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 500, "SetLoad in progress: skipping directJControl.");
+  }
+  else if (!ctl_iface_->directJControl(position_cmds, velocity_cmds, acceleration_cmds))
   {
     RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Kord failed to write joint positions");
     return hardware_interface::return_type::ERROR;
   }
 
+  write_digital_outputs();
   return hardware_interface::return_type::OK;
+}
+
+void KassowKordHardwareInterface::write_digital_outputs()
+{
+  // One IO request at a time
+  if (digital_output_service_.get_state() != KordServiceState::IDLE)
+  {
+    return;
+  }
+
+  uint64_t desired = digital_outputs_sent_;
+  for (size_t i = 0; i < KORD_OUTPUT_COUNT; ++i)
+  {
+    if (digital_outputs_itfs_[i].empty())
+    {
+      continue;
+    }
+    const double cmd = get_command(digital_outputs_itfs_[i]);
+    if (std::isnan(cmd))
+    {
+      continue;  // no command: keep the output as it is
+    }
+    desired = bit_helpers::double_to_bit(cmd) ? bit_helpers::set(desired, i)
+                                              : bit_helpers::clear(desired, i);
+  }
+
+  const uint64_t enable_mask = bit_helpers::get_bits_to_enable(desired, digital_outputs_sent_);
+  const uint64_t disable_mask = bit_helpers::get_bits_to_disable(desired, digital_outputs_sent_);
+  if (!enable_mask && !disable_mask)
+  {
+    return;
+  }
+
+  // KORD takes either enabled or disabled ports per request. Enable first, disable in the next
+  // request after this one is finished.
+  const size_t timeout_ticks = update_rate_;  // 1 s
+  if (enable_mask)
+  {
+    digital_output_service_.dispatch(*ctl_iface_, enable_mask, 0, timeout_ticks);
+  }
+  else
+  {
+    digital_output_service_.dispatch(*ctl_iface_, 0, disable_mask, timeout_ticks);
+  }
+  RCLCPP_INFO(
+    get_logger(), "Digital output request %ld sent: enable 0x%016lX, disable 0x%016lX",
+    digital_output_service_.get_request_rid(), digital_output_service_.get_enable_mask(),
+    digital_output_service_.get_disable_mask());
 }
 
 // clean all alarms
