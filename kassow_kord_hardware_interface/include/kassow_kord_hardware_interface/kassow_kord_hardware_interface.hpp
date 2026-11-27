@@ -24,6 +24,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -78,7 +79,8 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
-  enum MotionFlags : unsigned int
+  // Copy of the kord-api 3.0.2 protocol enums. Keep the names and values the same.
+  enum EMotionFlags : unsigned int
   {
     MOTION_FLAG_STANDBY = 1,
     MOTION_FLAG_TRACKING = 2,
@@ -96,7 +98,7 @@ public:
     MOTION_FLAG_ARTOACTIVE = 8192
   };
 
-  enum SafetyFlags : unsigned int
+  enum ESafetyFlags : unsigned int
   {
     SAFETY_FLAG_UPDATE = 1,
     SAFETY_FLAG_ESTOP = 2,
@@ -105,7 +107,7 @@ public:
     SAFETY_FLAG_USER_CONF_REQ = 16
   };
 
-  enum ButtonFlags : unsigned int
+  enum EButtonFlags : unsigned int
   {
     BUTTONS_FLAG_ESTOP = 0x01,
     BUTTONS_FLAG_PSTOP = 0x02,
@@ -114,21 +116,23 @@ public:
     BUTTONS_FLAG_TEACH = 0x10
   };
 
-  enum HWFlags : unsigned int
+  enum EHWFlags : unsigned int
   {
-    HW_FLAG_RUID_MISMATCH = 0x0004,
-    HW_FLAG_HARD_FAULT = 0x0008,
-    HW_FLAG_DISCOVERY_FAILED = 0x0100,
-    HW_FLAG_ERROR_BITS_SET = 0x0200,
-    HW_FLAG_DEVICE_DISABLED = 0x0400,
-    HW_FLAG_LOW_VOLTAGE = 0x0800,
-    HW_FLAG_IOB_INIT_TIMEOUT = 0x1000,
-    HW_FLAG_SYNC_INIT_TIMEOUT = 0x2000,
-    HW_FLAG_IOB_ESTOP_STALL = 0x4000,
-    HW_FLAG_IOB_PSTOP_STALL = 0x8000
+    HW_STAT_LOW_VOLTAGE_AFTER_RELAY_DETECTED = 0x01,
+    HW_STAT_INIT_BLOCKED = 0x02,
+    HW_STAT_INIT_RUID_MISMATCH = 0x04,
+    HW_STAT_HARD_FAULT = 0x08,
+    HW_STATUS_DISCOVERY_FAILED = 0x0100,
+    HW_STATUS_ERROR_BITS_SET = 0x0200,
+    HW_STATUS_DEVICE_DISABLED = 0x0400,
+    HW_STATUS_LOW_VOLTAGE = 0x0800,
+    HW_STATUS_IOB_INIT_TIMEOUT = 0x1000,
+    HW_STATUS_SYNC_INIT_TIMEOUT = 0x2000,
+    HW_STATUS_IOB_ESTOP_STALL = 0x4000,
+    HW_STATUS_IOB_PSTOP_STALL = 0x8000
   };
 
-  enum SystemAlarmCategory : unsigned int
+  enum ESystemAlarmCategory : unsigned int
   {
     CAT_SAFETY_EVENT = 0x01,
     CAT_SOFT_STOP_EVENT = 0x02,
@@ -136,7 +140,7 @@ public:
     CAT_CBUN_EVENT = 0x04
   };
 
-  enum SystemAlarmContext : unsigned int
+  enum ESystemAlarmContext : unsigned int
   {
     CNTXT_ESTOP = 0x01,
     CNTXT_PSTOP = 0x02,
@@ -144,8 +148,24 @@ public:
     CNTXT_SYSERR = 0x08
   };
 
+  // Motion flags that are normal while the hardware is active.
+  // Any other motion flag deactivates it.
+  static constexpr unsigned int ALLOWED_MOTION_FLAGS = MOTION_FLAG_STANDBY | MOTION_FLAG_TRACKING;
+  // Safety and button flags that deactivate the hardware. Any HW flag deactivates it.
+  static constexpr unsigned int STOP_SAFETY_FLAGS =
+    SAFETY_FLAG_ESTOP | SAFETY_FLAG_PSTOP | SAFETY_FLAG_SSTOP | SAFETY_FLAG_USER_CONF_REQ;
+  static constexpr unsigned int STOP_BUTTON_FLAGS =
+    BUTTONS_FLAG_ESTOP | BUTTONS_FLAG_PSTOP | BUTTONS_FLAG_BACKDRIVE | BUTTONS_FLAG_TEACH;
+
 private:
-  bool check_and_log_safety_violations();
+  // UNCLEARABLE: flags that clean_alarms() cannot clear. ALL: also the flags it can clear.
+  enum class FlagScope
+  {
+    UNCLEARABLE,
+    ALL
+  };
+  std::optional<std::string> find_tripped_flags(FlagScope scope);
+  void log_flags(const char * event, bool only_on_change);
   bool clean_alarms();
   void read_digital_io();
   void update_digital_output_request();
@@ -194,8 +214,16 @@ private:
   size_t update_rate_ = 500;
 
   // Testing, to be removed:
-  unsigned int motion_flags_prev_ = 0xFFFFFFFF;
+  // Motion, safety, button, HW and alarm flags at the last log. The start value forces a log.
+  std::array<unsigned int, 5> flags_logged_{~0u, ~0u, ~0u, ~0u, ~0u};
   bool skip_jcontrol_ = false;
+
+  // Logs the status flags and the alarm clearing at INFO level.
+  bool logging_verbose_ = true;
+
+  // Set at the first tripped flag and cleared in on_activate(). The async worker can overwrite a
+  // DEACTIVATE result before the controller manager reads it, so write() returns it again.
+  bool deactivate_latched_ = false;
 };
 
 }  // namespace kassow_kord_hardware_interface
