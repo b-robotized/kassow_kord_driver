@@ -20,19 +20,34 @@
 
 <launch>
 
-  <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
-  <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
-  <arg name="robot_model" default="kr810" description="The Kassow robot model to use."/>
   <arg name="prefix" default="kassow" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
-  <arg name="use_mock_hardware" default="false" description="Whether to use mock hardware or real hardware."/>
-  <arg name="ip_address" default="10.23.23.238" description="IP address of the robot."/>
+  <arg name="robot_model" default="kr810" description="The Kassow robot model to use."/>
+  <arg name="ros2_control_hardware_type" default="mock" description="Hardware type: mock or real">
+      <choice value="mock"/>
+      <choice value="real"/>
+  </arg>
+
+  <arg name="ip_address" default="10.23.23.206" description="IP address of the robot."/>
   <arg name="port" default="28283" description="Port of the robot."/>
   <arg name="session_id" default="1" description="Session ID of the robot."/>
 
+  <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
+  <arg name="description_file" default="kassow_kord" description="URDF/XACRO description file with the robot."/>
+
+  <!-- Async parameters -->
+  <arg name="is_async" default="true" description="Run ros2_control in async mode."/>
+  <arg name="scheduling_policy" default="slave" description="Thread scheduling policy."/>
+  <arg name="thread_priority" default="70" description="Thread priority for async mode."/>
+  <arg name="cpu_affinity" default="[2,3]" description="CPU affinity for async threads."/>
+
   <let name="robot_description" value="$(command '$(find-exec xacro) $(find-pkg-share $(var description_package))/urdf/$(var description_file).urdf.xacro \
+                                        ros2_control_hardware_type:=$(var ros2_control_hardware_type) \
+                                        is_async:=$(var is_async) \
+                                        scheduling_policy:=$(var scheduling_policy) \
+                                        thread_priority:=$(var thread_priority) \
+                                        cpu_affinity:=$(var cpu_affinity) \
                                         robot_model:=$(var robot_model) \
                                         prefix:=$(var prefix) \
-                                        use_mock_hardware:=$(var use_mock_hardware) \
                                         ip_address:=$(var ip_address) \
                                         port:=$(var port) \
                                         session_id:=$(var session_id)')"/>

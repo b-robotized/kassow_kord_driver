@@ -23,7 +23,10 @@
   <arg name="description_package" default="kassow_kord_bringup" description="Description package with robot URDF/xacro files. Usually not set, it enables use of a custom description."/>
   <arg name="description_file" default="kassow_kord_dual_arm" description="URDF/XACRO description file with the robot."/>
 
-  <arg name="use_mock_hardware" default="false" description="Whether to use mock hardware or real hardware."/>
+  <arg name="ros2_control_hardware_type" default="mock" description="Hardware type: mock or real">
+      <choice value="mock"/>
+      <choice value="real"/>
+  </arg>
 
   <arg name="robot_1_prefix" default="kassow_left" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
   <arg name="robot_1_ip_address" default="10.23.23.205" description="IP address of the robot."/>
@@ -31,24 +34,42 @@
   <arg name="robot_1_session_id" default="1" description="Session ID of the robot."/>
   <arg name="robot_1_model" default="kr810" description="The Kassow robot model to use."/>
 
+  <arg name="robot_1_is_async" default="true"/>
+  <arg name="robot_1_scheduling_policy" default="slave"/>
+  <arg name="robot_1_thread_priority" default="70"/>
+  <arg name="robot_1_cpu_affinity" default="[2,3]"/>
+
   <arg name="robot_2_prefix" default="kassow_right" description="Prefix of the joint names, useful for multi-robot setup. If changed, joint names in controller config must also be updated."/>
   <arg name="robot_2_ip_address" default="10.23.23.204" description="IP address of the robot."/>
   <arg name="robot_2_port" default="28283" description="Port of the robot."/>
   <arg name="robot_2_session_id" default="1" description="Session ID of the robot."/>
   <arg name="robot_2_model" default="kr810" description="The Kassow robot model to use."/>
 
+  <arg name="robot_2_is_async" default="true"/>
+  <arg name="robot_2_scheduling_policy" default="slave"/>
+  <arg name="robot_2_thread_priority" default="70"/>
+  <arg name="robot_2_cpu_affinity" default="[2,3]"/>
+
   <let name="robot_description" value="$(command '$(find-exec xacro) $(find-pkg-share $(var description_package))/urdf/$(var description_file).urdf.xacro \
-                                        use_mock_hardware:=$(var use_mock_hardware) \
+                                        ros2_control_hardware_type:=$(var ros2_control_hardware_type) \
                                         robot_1_model:=$(var robot_1_model) \
                                         robot_1_prefix:=$(var robot_1_prefix) \
                                         robot_1_ip:=$(var robot_1_ip_address) \
                                         robot_1_port:=$(var robot_1_port) \
                                         robot_1_session_id:=$(var robot_1_session_id) \
+                                        robot_1_is_async:=$(var robot_1_is_async) \
+                                        robot_1_scheduling_policy:=$(var robot_1_scheduling_policy) \
+                                        robot_1_thread_priority:=$(var robot_1_thread_priority) \
+                                        robot_1_cpu_affinity:=$(var robot_1_cpu_affinity) \
                                         robot_2_model:=$(var robot_2_model) \
                                         robot_2_prefix:=$(var robot_2_prefix) \
                                         robot_2_ip:=$(var robot_2_ip_address) \
                                         robot_2_port:=$(var robot_2_port) \
-                                        robot_2_session_id:=$(var robot_2_session_id)')"/>
+                                        robot_2_session_id:=$(var robot_2_session_id) \
+                                        robot_2_is_async:=$(var robot_2_is_async) \
+                                        robot_2_scheduling_policy:=$(var robot_2_scheduling_policy) \
+                                        robot_2_thread_priority:=$(var robot_2_thread_priority) \
+                                        robot_2_cpu_affinity:=$(var robot_2_cpu_affinity)')"/>
 
   <node pkg="robot_state_publisher" exec="robot_state_publisher" output="both">
     <param name="robot_description" value="$(var robot_description)"/>

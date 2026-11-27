@@ -25,6 +25,7 @@
 
   <include file="$(find-pkg-share $(var description_package))/launch/kassow_kord_description.launch.xml">
     <arg name="robot_model" value="$(var robot_model)"/>
+    <arg name="ros2_control_hardware_type" value="mock"/>
   </include>
 
   <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" name="joint_state_publisher_node"/>

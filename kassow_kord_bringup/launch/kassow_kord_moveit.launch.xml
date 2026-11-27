@@ -19,6 +19,11 @@
 -->
 
 <launch>
+  <arg name="robot_model" default="kr810" description="Model of the robot to use">
+      <choice value="kr810"/>
+      <choice value="kr1018"/>
+  </arg>
+
   <arg name="configuration_package"
          default="kassow_kord_bringup"
          description="The ROS package where we find the configuration files."/>
@@ -67,7 +72,7 @@
   </arg>
 
   <let name="robot_description_semantic_content"
-       value="$(command '$(find-exec xacro) $(var semantic_description_file_path) prefix:=$(var prefix)')"/>
+       value="$(command '$(find-exec xacro) $(var semantic_description_file_path) prefix:=$(var prefix) robot_model:=$(var robot_model)')"/>
 
   <node pkg="moveit_ros_move_group" exec="move_group" output="screen">
     <env name="LC_ALL" value="en_US.UTF-8"/>
