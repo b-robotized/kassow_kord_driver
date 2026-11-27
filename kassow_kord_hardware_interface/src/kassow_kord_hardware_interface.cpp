@@ -225,16 +225,7 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
       return hardware_interface::CallbackReturn::ERROR;
     }
 
-    // Validate we have four state interface
-    if (joint.state_interfaces.size() != 4)
-    {
-      RCLCPP_FATAL(
-        get_logger(), "Joint '%s' state interface invalid. Expected exactly four state interfaces.",
-        joint.name.c_str());
-      return hardware_interface::CallbackReturn::ERROR;
-    }
-
-    // Validate state interfaces
+    // Validate state interfaces. effort_reference and torque_deviation are optional.
     required_interfaces = 0;
 
     for (const auto & state_interface : joint.state_interfaces)
@@ -245,10 +236,22 @@ hardware_interface::CallbackReturn KassowKordHardwareInterface::on_init(
         state_interface.name == hardware_interface::HW_IF_ACCELERATION ||
         state_interface.name == hardware_interface::HW_IF_EFFORT)
       {
-        if (++required_interfaces == 4)
-        {
-          break;
-        }
+        ++required_interfaces;
+      }
+      else if (state_interface.name == "effort_reference")
+      {
+        joint_effort_reference_itfs_[joint_index] = joint.name + "/" + state_interface.name;
+      }
+      else if (state_interface.name == "torque_deviation")
+      {
+        joint_torque_deviation_itfs_[joint_index] = joint.name + "/" + state_interface.name;
+      }
+      else
+      {
+        RCLCPP_FATAL(
+          get_logger(), "Joint '%s' has unknown state interface '%s'.", joint.name.c_str(),
+          state_interface.name.c_str());
+        return hardware_interface::CallbackReturn::ERROR;
       }
     }
 
@@ -730,6 +733,10 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
   acceleration_states =
     rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_ACTUAL_QDD);
   torque_states = rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_SENSED_TRQ);
+  const auto effort_reference =
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::T_REFERENCE_TRQ);
+  const auto torque_deviation =
+    rcv_iface_->getJoint(kr2::kord::ReceiverInterface::EJointValue::S_TRQDEV_SMOOTH);
 
   for (size_t i = 0; i < KORD_JOINT_COUNT; ++i)
   {
@@ -737,6 +744,14 @@ hardware_interface::return_type KassowKordHardwareInterface::read(
     set_state(joint_velocity_itfs_[i], velocity_states[i]);
     set_state(joint_acceleration_itfs_[i], acceleration_states[i]);
     set_state(joint_effort_itfs_[i], torque_states[i]);
+    if (!joint_effort_reference_itfs_[i].empty())
+    {
+      set_state(joint_effort_reference_itfs_[i], effort_reference[i]);
+    }
+    if (!joint_torque_deviation_itfs_[i].empty())
+    {
+      set_state(joint_torque_deviation_itfs_[i], torque_deviation[i]);
+    }
   }
 
   if (has_tcp_pose_)

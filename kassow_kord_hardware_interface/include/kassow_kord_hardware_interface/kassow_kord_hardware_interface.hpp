@@ -183,6 +183,9 @@ private:
   std::array<std::string, KORD_JOINT_COUNT> joint_velocity_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_acceleration_itfs_;
   std::array<std::string, KORD_JOINT_COUNT> joint_effort_itfs_;
+  // Optional state interfaces. Empty if the joint does not have them.
+  std::array<std::string, KORD_JOINT_COUNT> joint_effort_reference_itfs_;
+  std::array<std::string, KORD_JOINT_COUNT> joint_torque_deviation_itfs_;
 
   std::array<double, KORD_JOINT_COUNT> position_states{};
   std::array<double, KORD_JOINT_COUNT> velocity_states{};
